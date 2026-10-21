@@ -668,8 +668,18 @@
    </div>
  </div>
 
-  <!-- Modal de activación: clave del dispositivo -->
-  <div class="notice-modal active" id="authModal">
+  <!-- Modal de validación: código no encontrado -->
+  <div class="notice-modal" id="validacionModal">
+    <div class="notice-box">
+      <div class="notice-icon">⚠️</div>
+      <h2>Código no encontrado</h2>
+      <p id="validacionText">El código introducido no está en la lista de piezas. ¿Quieres enviar de todos modos?</p>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">
+        <button class="notice-btn" id="btnValidacionCancelar" style="background:#f3f4f6;color:#374151;">Cancelar</button>
+        <button class="notice-btn" id="btnValidacionEnviar">Enviar de todos modos</button>
+      </div>
+    </div>
+  </div>
     <div class="notice-box">
       <div class="notice-icon">🔐</div>
       <h2>Activar dispositivo</h2>
@@ -1043,9 +1053,11 @@
             return;
           }
           if (!esCodigoPiezaValido(codigoPieza)) {
-            alert('El código de pieza no es válido. Verifica que esté en la lista.');
-            codigoPiezaInput.focus();
-            return;
+            const confirmar = await mostrarValidacion(codigoPieza);
+            if (!confirmar) {
+              codigoPiezaInput.focus();
+              return;
+            }
           }
         } else {
           if (!destinatario) {
@@ -1152,6 +1164,43 @@
       function esCodigoPiezaValido(codigo) {
         if (codigosPiezas.length === 0) return true;
         return codigosPiezas.some(c => c.toLowerCase() === codigo.toLowerCase());
+      }
+
+      // ---------- Modal de validación para códigos no encontrados ----------
+      const validacionModal = document.getElementById('validacionModal');
+      const validacionText = document.getElementById('validacionText');
+      const btnValidacionCancelar = document.getElementById('btnValidacionCancelar');
+      const btnValidacionEnviar = document.getElementById('btnValidacionEnviar');
+      let validacionResolve = null;
+
+      function mostrarValidacion(codigo) {
+        return new Promise((resolve) => {
+          validacionResolve = resolve;
+          if (validacionText) {
+            validacionText.textContent = `El código "${codigo}" no está en la lista de piezas. ¿Quieres enviar de todos modos?`;
+          }
+          if (validacionModal) validacionModal.classList.add('active');
+        });
+      }
+
+      function cerrarValidacion(resultado) {
+        if (validacionModal) validacionModal.classList.remove('active');
+        if (validacionResolve) {
+          validacionResolve(resultado);
+          validacionResolve = null;
+        }
+      }
+
+      if (btnValidacionCancelar) {
+        btnValidacionCancelar.addEventListener('click', () => cerrarValidacion(false));
+      }
+      if (btnValidacionEnviar) {
+        btnValidacionEnviar.addEventListener('click', () => cerrarValidacion(true));
+      }
+      if (validacionModal) {
+        validacionModal.addEventListener('click', (e) => {
+          if (e.target === validacionModal) cerrarValidacion(false);
+        });
       }
 
       function mostrarAutocompletado(filtro) {

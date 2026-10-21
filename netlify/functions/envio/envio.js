@@ -328,10 +328,8 @@ exports.handler = async function (event) {
       const codigoSaneado = sanitizarNombre(codigoPieza);
 
       // Validación contra la lista de códigos (si está disponible)
-      const codigos = getCodigosPiezas();
-      if (codigos.size > 0 && !codigos.has(codigoPieza.toLowerCase())) {
-        return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Código de pieza no válido' }) };
-      }
+      // Nota: se permite enviar códigos no listados (validación solo en frontend como aviso)
+      // La lista se usa para autocompletado, no para bloqueo estricto
 
       baseFolder = (process.env.PIEZAS_FOLDER || 'General/Fotos piezas')
         .split('/').map(s => s.trim()).filter(Boolean);
