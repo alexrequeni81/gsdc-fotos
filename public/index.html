@@ -559,7 +559,8 @@
 
       <div class="form-group" id="grupoCodigoPieza" style="display:none;">
         <label for="codigoPieza">Código de pieza <span class="required">*</span></label>
-        <input type="text" id="codigoPieza" placeholder="Ej: ABC-123, REF-456..." autocomplete="off" />
+        <input type="text" id="codigoPieza" placeholder="Ej: ABC-123, REF-456..." autocomplete="off" list="listaPiezas" />
+        <datalist id="listaPiezas"></datalist>
       </div>
 
       <div class="form-group photo-section" style="flex:1;">
@@ -1010,9 +1011,26 @@
         return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
       }
 
-      // ---------- Evento input ----------
-      destinatarioInput.addEventListener('input', actualizarUI);
-      codigoPiezaInput.addEventListener('input', actualizarUI);
+      // ---------- Carga de códigos de piezas (autocompletado) ----------
+      async function cargarCodigosPiezas() {
+        try {
+          const res = await fetch('/piezas.json');
+          if (!res.ok) return;
+          const codigos = await res.json();
+          const datalist = document.getElementById('listaPiezas');
+          if (!datalist || !Array.isArray(codigos)) return;
+          // Limitar a 5000 opciones para no saturar el DOM
+          const fragment = document.createDocumentFragment();
+          codigos.slice(0, 5000).forEach((codigo) => {
+            const option = document.createElement('option');
+            option.value = codigo;
+            fragment.appendChild(option);
+          });
+          datalist.appendChild(fragment);
+        } catch (e) {
+          console.warn('No se pudo cargar piezas.json:', e);
+        }
+      }
 
       // ---------- Service Worker ----------
       if ('serviceWorker' in navigator) {
@@ -1124,6 +1142,7 @@
           fotos.push(typeof foto === 'string' ? { dataUrl: foto, timestamp: Date.now() } : foto);
         });
         actualizarUI();
+        cargarCodigosPiezas();
         if (getStoredToken()) {
           if (authModal) authModal.classList.remove('active');
           comprobarEstadoSharePoint();
