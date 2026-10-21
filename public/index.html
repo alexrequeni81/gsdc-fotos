@@ -1194,12 +1194,6 @@
           autocompleteDropdown.classList.remove('active');
         }
       }
-      }
-
-      function esCodigoPiezaValido(codigo) {
-        if (codigosPiezas.length === 0) return true; // si no se cargó la lista, se permite
-        return codigosPiezas.some(c => c.toLowerCase() === codigo.toLowerCase());
-      }
 
       // ---------- Service Worker ----------
       if ('serviceWorker' in navigator) {
