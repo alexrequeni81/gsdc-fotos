@@ -30,6 +30,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Ignorar peticiones que no sean http/https (ej. chrome-extension://)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
   if (event.request.method !== 'GET') {
     event.respondWith(
       fetch(event.request).catch(() => {

@@ -565,7 +565,7 @@
   <script>
     // Autodefensa: si el HTML cacheado es antiguo y no tiene el modal de auth,
     // forzar recarga limpia saltándose la caché del SW.
-    (function() {
+    window.addEventListener('DOMContentLoaded', function() {
       try {
         if (!document.getElementById('authInput') && !sessionStorage.getItem('gsdc_selfheal')) {
           sessionStorage.setItem('gsdc_selfheal', '1');
@@ -576,8 +576,8 @@
           sessionStorage.removeItem('gsdc_selfheal');
         }
       } catch (_) {}
-    })();
- </script>
+    });
+  </script>
   <div class="app">
     <div class="app-header">
       <h1>📷 Fotos Envíos</h1>
@@ -1249,7 +1249,7 @@
         navigator.serviceWorker.getRegistrations().then((regs) => {
           regs.forEach((r) => r.unregister());
         });
-        navigator.serviceWorker.register('/service-worker.js?v=5').then((reg) => {
+        navigator.serviceWorker.register('/service-worker.js').then((reg) => {
           reg.update();
         }).catch(() => {});
       }
