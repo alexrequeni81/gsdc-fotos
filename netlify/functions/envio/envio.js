@@ -346,6 +346,9 @@ exports.handler = async function (event) {
     const subidos = [];
     const fallidos = [];
 
+    // Notas (solo para piezas)
+    const notas = tipo === 'pieza' ? String(payload.notas || '').trim() : '';
+
     for (let i = 0; i < fotos.length; i++) {
       const foto = fotos[i];
 
@@ -392,6 +395,23 @@ exports.handler = async function (event) {
         subidos.push({ nombre, tamano: buffer.length });
       } catch (err) {
         fallidos.push({ nombre, error: err.message });
+      }
+    }
+
+    // --- Subida de notas (.txt) para piezas ---
+    if (tipo === 'pieza' && notas) {
+      const codigoSaneado = sanitizarNombre(String(payload.codigoPieza || '').trim().replace(/\s+/g, ' '));
+      const txtNombre = `${codigoSaneado}.txt`;
+      const txtUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${dirPath}/${encodeURIComponent(txtNombre)}:/content?@microsoft.graph.conflictBehavior=replace`;
+      try {
+        await graph(txtUrl, token, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          body: Buffer.from(notas, 'utf-8')
+        });
+        subidos.push({ nombre: txtNombre, tamano: Buffer.byteLength(notas, 'utf-8') });
+      } catch (err) {
+        fallidos.push({ nombre: txtNombre, error: err.message });
       }
     }
 

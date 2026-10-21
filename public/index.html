@@ -563,6 +563,11 @@
         <datalist id="listaPiezas"></datalist>
       </div>
 
+      <div class="form-group" id="grupoNotas" style="display:none;">
+        <label for="notasPieza">Notas (opcional)</label>
+        <textarea id="notasPieza" rows="3" placeholder="Ej: Pieza con arañazo, falta tornillo..." style="width:100%;padding:14px 16px;font-size:16px;border:1.5px solid #e2e8f0;border-radius:16px;background:#fafbfc;outline:none;color:#0f172a;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+
       <div class="form-group photo-section" style="flex:1;">
         <div class="photo-header">
           <label>Añadir fotos <span class="required">*</span></label>
@@ -633,8 +638,10 @@
       const tabPiezas = document.getElementById('tabPiezas');
       const grupoDestinatario = document.getElementById('grupoDestinatario');
       const grupoCodigoPieza = document.getElementById('grupoCodigoPieza');
+      const grupoNotas = document.getElementById('grupoNotas');
       const destinatarioInput = document.getElementById('destinatario');
       const codigoPiezaInput = document.getElementById('codigoPieza');
+      const notasPiezaInput = document.getElementById('notasPieza');
       const galeria = document.getElementById('galeria');
       const contadorSpan = document.getElementById('contadorFotos');
       const btnAbrirCamara = document.getElementById('btnAbrirCamara');
@@ -746,6 +753,7 @@
         }
 
         contadorSpan.textContent = `${fotos.length} / ${MAX_FOTOS}`;
+        contadorSpan.style.display = moduloActual === 'pieza' ? 'none' : '';
         btnAbrirCamara.disabled = fotos.length >= MAX_FOTOS;
         btnVaciar.hidden = !envioFallido;
         btnVaciar.disabled = fotos.length === 0;
@@ -774,6 +782,7 @@
         fotos.length = 0;
         if (moduloActual === 'pieza') {
           codigoPiezaInput.value = '';
+          notasPiezaInput.value = '';
         } else {
           destinatarioInput.value = '';
         }
@@ -886,11 +895,13 @@
         if (modulo === 'pieza') {
           grupoDestinatario.style.display = 'none';
           grupoCodigoPieza.style.display = '';
+          grupoNotas.style.display = '';
           destinatarioInput.removeAttribute('required');
           codigoPiezaInput.setAttribute('required', '');
         } else {
           grupoDestinatario.style.display = '';
           grupoCodigoPieza.style.display = 'none';
+          grupoNotas.style.display = 'none';
           destinatarioInput.setAttribute('required', '');
           codigoPiezaInput.removeAttribute('required');
         }
@@ -951,6 +962,8 @@
 
         if (moduloActual === 'pieza') {
           payload.codigoPieza = codigoPieza;
+          const notas = notasPiezaInput.value.trim();
+          if (notas) payload.notas = notas;
         } else {
           payload.destinatario = destinatario;
         }
@@ -973,6 +986,7 @@
             fotos.length = 0;
             if (moduloActual === 'pieza') {
               codigoPiezaInput.value = '';
+              notasPiezaInput.value = '';
             } else {
               destinatarioInput.value = '';
             }
