@@ -23,6 +23,44 @@
 let cachedToken = null;
 let tokenExpiry = 0;
 
+// --- Lista cerrada de destinatarios válidos (se compara en minúsculas) ---
+const ALLOWED_DESTINATARIOS = new Set([
+  'jefferson',
+  'wonderful',
+  'fresno',
+  'vidalia',
+  'giro gmbh',
+  'giro italia',
+  'filpack',
+  'lawtons/xact',
+  'edp'
+]);
+
+// Tamaño máximo del cuerpo JSON aceptado por la función (~6 MB Netlify).
+const MAX_BODY_BYTES = 6 * 1024 * 1024;
+// Tamaño máximo por foto decodificada (~1.5 MB).
+const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
+
+/**
+ * Comprueba que los bytes decodificados empiezan por una cabecera JPEG o PNG.
+ *   JPEG: FF D8 FF                     -> base64 "/9j"
+ *   PNG:  89 50 4E 47 0D 0A 1A 0A      -> base64 "iVBORw"
+ */
+function looksLikeImage(base64, mime) {
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return base64.startsWith('/9j');
+  if (mime === 'image/png') return base64.startsWith('iVBORw');
+  return false;
+}
+
+/**
+ * Sanitiza el nombre de carpeta/archivo para SharePoint: sustituye por '_'
+ * los caracteres que SharePoint no admite (/, \, :, *, ?, ", <, >, |, #).
+ * Ej.: "Lawtons/Xact" -> "Lawtons_Xact".
+ */
+function sanitizarNombre(s) {
+  return String(s).replace(/[/\\:*?"<>|#]/g, '_').replace(/\s+/g, ' ');
+}
+
 /**
  * Obtiene (y cachea) un token de acceso de Microsoft Graph.
  * Flujo client-credentials: la aplicación se identifica ante Entra ID.
@@ -62,6 +100,74 @@ async function getGraphToken() {
   cachedToken = data.access_token;
   tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
   return cachedToken;
+}
+
+/**
+ * Valida la cabecera X-App-Token contra la variable de entorno APP_TOKEN.
+ * Devuelve true si la clave coincide (o si APP_TOKEN no está configurada en el server,
+ * en cuyo caso se permite para no bloquear durante el desarrollo).
+ */
+function checkAuth(event, CORS) {
+  const expected = process.env.APP_TOKEN;
+  if (!expected) return true; // sin clave configurada -> abierto (modo dev)
+
+  const headers = event.headers || {};
+  const provided = headers['x-app-token'] || headers['X-App-Token'] || headers['X-APP-TOKEN'];
+  if (!provided) return false;
+
+  // Comparación en tiempo constante para evitar timing attacks.
+  if (provided.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < provided.length; i++) {
+    mismatch |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+/**
+ * Allowlist de IP (opcional): restringe qué direcciones IP pueden llamar a la
+ * función. Se configura solo con la variable de entorno ALLOWED_IPS (Netlify),
+ * lista separada por comas de IPs exactas o rangos IPv4 en notación CIDR.
+ *   - Vacía / sin definir -> abierto (comportamiento actual, no bloquea nada).
+ *   - La IP real del cliente la inyecta Netlify en la cabecera
+ *     "x-nf-client-connection-ip" (no se puede suplantar).
+ *   - Si la allowlist está activa y la IP no está contemplada -> 403.
+ */
+function checkIpAllowlist(event) {
+  const lista = (process.env.ALLOWED_IPS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (lista.length === 0) return true; // abierto: ALLOWED_IPS sin definir
+
+  const headers = event.headers || {};
+  const ip = normalizarIp(headers['x-nf-client-connection-ip'] || '');
+  if (!ip) return false; // allowlist activada sin IP detectable -> se deniega
+
+  return lista.some((entry) => {
+    const e = normalizarIp(entry);
+    const partes = e.split('/');
+    if (partes.length === 2 && partes[0].includes('.')) {
+      const bits = parseInt(partes[1], 10);
+      if (!isNaN(bits) && bits >= 0 && bits <= 32) {
+        return ipv4EnCidr(ip, partes[0], bits);
+      }
+    }
+    return ip === e;
+  });
+}
+
+// "::ffff:1.2.3.4" (IPv4 mapeada a IPv6) se normaliza a "1.2.3.4".
+function normalizarIp(ip) {
+  const s = String(ip || '').trim();
+  const m = s.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  return m ? m[1] : s;
+}
+
+function ipv4AEntero(ip) {
+  return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>> 0;
+}
+
+function ipv4EnCidr(ip, red, bits) {
+  const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+  return (ipv4AEntero(ip) & mask) === (ipv4AEntero(red) & mask);
 }
 
 /**
@@ -141,16 +247,29 @@ async function ensureFolder(token, driveId, segments) {
 /**
  * Punto de entrada de la Netlify Function.
  * Rutas: GET = health check, POST = subida de fotos.
+ * Todas las rutas requieren cabecera X-App-Token (validada contra APP_TOKEN).
  */
 exports.handler = async function (event) {
+  // CORS restringido al dominio de la app (no se acepta '*').
+  const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://willowy-cranachan-417c2c.netlify.app';
   const CORS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS, body: '' };
+  }
+
+  // --- Allowlist de IP (opcional): perímetro antes de hablar de claves ---
+  if (!checkIpAllowlist(event)) {
+    return { statusCode: 403, headers: CORS, body: JSON.stringify({ error: 'IP no permitida' }) };
+  }
+
+  // --- Autenticación por clave de dispositivo (X-App-Token vs APP_TOKEN) ---
+  if (!checkAuth(event, CORS)) {
+    return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Clave no válida' }) };
   }
 
   if (event.httpMethod === 'GET') {
@@ -162,13 +281,24 @@ exports.handler = async function (event) {
   }
 
   try {
+    // --- Tamaño total del payload (defensa contra envíos masivos) ---
+    const bodyBytes = Buffer.byteLength(event.body || '', 'utf8');
+    if (bodyBytes > MAX_BODY_BYTES) {
+      return { statusCode: 413, headers: CORS, body: JSON.stringify({ error: 'Payload demasiado grande' }) };
+    }
+
     // --- Lectura y validación del payload ---
     const payload = JSON.parse(event.body || '{}');
-    const destinatario = String(payload.destinatario || '').trim();
+    const destinatario = String(payload.destinatario || '').trim().replace(/\s+/g, ' ');
+
+    if (!ALLOWED_DESTINATARIOS.has(destinatario.toLowerCase())) {
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Destinatario no permitido' }) };
+    }
+
     const fotos = Array.isArray(payload.fotos) ? payload.fotos.filter(f => f && f.dataUrl) : [];
 
-    if (!destinatario || fotos.length === 0) {
-      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'destinatario y al menos una foto son obligatorios' }) };
+    if (fotos.length === 0) {
+      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Es obligatorio al menos una foto' }) };
     }
     if (fotos.length > 10) {
       return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Máximo 10 fotos' }) };
@@ -184,11 +314,13 @@ exports.handler = async function (event) {
     // Carpeta día (AAAAMMDD) a partir de la fecha de la primera foto.
     const dia = String(fotos[0].fecha || '').trim().slice(0, 10);
     const yyyymmdd = dia.replace(/-/g, '');
-    const segments = [...baseFolder, destinatario, yyyymmdd];
+    // El destinatario se sanea para SharePoint (p. ej. "Lawtons/Xact" -> "Lawtons_Xact").
+    const nombreCarpeta = sanitizarNombre(destinatario);
+    const segments = [...baseFolder, nombreCarpeta, yyyymmdd];
     await ensureFolder(token, driveId, segments);
 
     // --- Subida de cada foto ---
-    const nombreCliente = destinatario.replace(/\s+/g, '_');
+    const nombreCliente = nombreCarpeta.replace(/\s+/g, '_');
     const dirPath = encodeURIComponent(segments.join('/')).replace(/%2F/g, '/');
     const subidos = [];
     const fallidos = [];
@@ -203,14 +335,26 @@ exports.handler = async function (event) {
         marca = fecha.slice(0, 10).replace(/-/g, '') + '_' + fecha.slice(11).replace(/:/g, '');
       }
       const contador = String(i + 1).padStart(3, '0');
-      const mime = (String(foto.dataUrl).match(/^data:([^;]+);/) || [null, 'image/jpeg'])[1];
+      const mimeRaw = (String(foto.dataUrl).match(/^data:([^;]+);/) || [null, ''])[1];
+      const mime = String(mimeRaw).toLowerCase();
       const ext = (mime.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
       const base64 = String(foto.dataUrl).split(',')[1] || '';
+
+      // Validaciones de seguridad por foto: tipo permitido y magic bytes.
       if (!base64) { fallidos.push({ nombre: 'foto_' + contador, error: 'DataURL sin contenido base64' }); continue; }
+      if (mime !== 'image/jpeg' && mime !== 'image/jpg' && mime !== 'image/png') {
+        fallidos.push({ nombre: 'foto_' + contador, error: 'Tipo de archivo no permitido (' + mime + ')' }); continue;
+      }
+      if (!looksLikeImage(base64, mime)) {
+        fallidos.push({ nombre: 'foto_' + contador, error: 'El contenido no parece una imagen válida' }); continue;
+      }
+      const buffer = Buffer.from(base64, 'base64');
+      if (buffer.length > MAX_PHOTO_BYTES) {
+        fallidos.push({ nombre: 'foto_' + contador, error: 'Foto demasiado grande (' + buffer.length + ' bytes)' }); continue;
+      }
 
       // Nombre final: AAAAMMDD_HHMMSS_00N_Destinatario.jpg
       const nombre = `${marca}_${contador}_${nombreCliente}.${ext}`;
-      const buffer = Buffer.from(base64, 'base64');
       const fileUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${dirPath}/${encodeURIComponent(nombre)}:/content?@microsoft.graph.conflictBehavior=replace`;
 
       try {

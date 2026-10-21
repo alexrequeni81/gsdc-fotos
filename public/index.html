@@ -79,7 +79,8 @@
       margin-left: 2px;
     }
 
-    .form-group input[type="text"] {
+    .form-group input[type="text"],
+    .form-group select {
       width: 100%;
       padding: 14px 16px;
       font-size: 16px;
@@ -89,12 +90,23 @@
       transition: border 0.2s, box-shadow 0.2s;
       outline: none;
       color: #0f172a;
+      appearance: none;
+      -webkit-appearance: none;
     }
 
-    .form-group input[type="text"]:focus {
+    .form-group input[type="text"]:focus,
+    .form-group select:focus {
       border-color: #4f46e5;
       box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
       background: #ffffff;
+    }
+
+    .form-group select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%234f46e5' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 12px;
+      padding-right: 40px;
     }
 
     .photo-section {
@@ -156,6 +168,27 @@
 
     .btn-camera:active { transform: scale(0.96); background: #4338ca; }
     .btn-camera:disabled { opacity: 0.5; pointer-events: none; box-shadow: none; }
+
+    .btn-vaciar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      padding: 14px 18px;
+      border-radius: 60px;
+      font-size: 15px;
+      font-weight: 600;
+      flex: 1;
+      min-width: 120px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      touch-action: manipulation;
+    }
+    .btn-vaciar:active { transform: scale(0.96); background: #e5e7eb; }
+    .btn-vaciar:disabled { opacity: 0.5; pointer-events: none; }
 
     .gallery {
       display: flex;
@@ -420,6 +453,33 @@
       cursor: pointer;
     }
 
+    .notice-box input[type="password"],
+    .notice-box input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      outline: none;
+      text-align: center;
+      letter-spacing: 2px;
+      font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+    }
+
+    .notice-box input:focus {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
+    }
+
+    .notice-box .notice-error {
+      color: #dc2626;
+      font-size: 13px;
+      margin-top: -8px;
+      margin-bottom: 12px;
+      min-height: 16px;
+    }
+
     @media (max-width: 480px) {
       .app { padding: 20px 16px 84px; }
       .photo-item { width: 70px; height: 70px; }
@@ -429,6 +489,22 @@
   </style>
 </head>
 <body>
+  <script>
+    // Autodefensa: si el HTML cacheado es antiguo y no tiene el modal de auth,
+    // forzar recarga limpia saltándose la caché del SW.
+    (function() {
+      try {
+        if (!document.getElementById('authInput') && !sessionStorage.getItem('gsdc_selfheal')) {
+          sessionStorage.setItem('gsdc_selfheal', '1');
+          var u = new URL(location.href);
+          u.searchParams.set('cb', String(Date.now()));
+          location.replace(u.toString());
+        } else if (sessionStorage.getItem('gsdc_selfheal')) {
+          sessionStorage.removeItem('gsdc_selfheal');
+        }
+      } catch (_) {}
+    })();
+ </script>
   <div class="app">
     <div class="app-header">
       <h1>📷 Fotos Envíos</h1>
@@ -437,9 +513,20 @@
 
     <form id="formulario" novalidate style="display:flex; flex-direction:column; flex:1;">
       <div class="form-group">
-        <label for="destinatario">Destinatario (lugar) <span class="required">*</span></label>
-        <input type="text" id="destinatario" placeholder="Ej: Jefferson, Fresno..." required autocomplete="off" />
-      </div>
+        <label for="destinatario">Destinatario <span class="required">*</span></label>
+        <select id="destinatario" required>
+          <option value="" disabled selected>Selecciona destinatario</option>
+          <option value="Jefferson">Jefferson</option>
+          <option value="Wonderful">Wonderful</option>
+          <option value="Fresno">Fresno</option>
+          <option value="Vidalia">Vidalia</option>
+          <option value="Giro GMBH">Giro GMBH</option>
+          <option value="Giro Italia">Giro Italia</option>
+          <option value="Filpack">Filpack</option>
+          <option value="Lawtons/Xact">Lawtons/Xact</option>
+          <option value="EDP">EDP</option>
+       </select>
+     </div>
 
       <div class="form-group photo-section" style="flex:1;">
         <div class="photo-header">
@@ -450,6 +537,7 @@
           <button type="button" class="btn-camera" id="btnAbrirCamara">
             <span>📸</span> Tomar foto
           </button>
+          <button type="button" class="btn-vaciar" id="btnVaciar" hidden disabled>🔄 Vaciar</button>
         </div>
         <div class="gallery" id="galeria">
           <div class="empty-msg">Todavía no hay fotos</div>
@@ -484,10 +572,22 @@
     <div class="notice-box">
       <div class="notice-icon">⏳</div>
       <h2>Pendiente autorización IT</h2>
-      <p id="noticeText">La conexión con SharePoint aún no está activada por el departamento de IT. Podrás tomar las fotos, pero no se podrán guardar en SharePoint hasta que se conceda el permiso.</p>
+      <p id="noticeText">La conexión con SharePoint aún no está activada por el departamento de IT. Podrás tomar las fotos, pero no se podrán guardar en SharePoint hasta que se conceda el permiso</p>
       <button class="notice-btn" id="btnCerrarAviso">Entendido</button>
-    </div>
-  </div>
+   </div>
+ </div>
+
+  <!-- Modal de activación: clave del dispositivo -->
+  <div class="notice-modal active" id="authModal">
+    <div class="notice-box">
+      <div class="notice-icon">🔐</div>
+      <h2>Activar dispositivo</h2>
+      <p>Introduce la clave que te ha facilitado tu supervisor para empezar a usar la app</p>
+      <input type="password" id="authInput" placeholder="Clave" autocomplete="off" />
+      <div class="notice-error" id="authError"></div>
+      <button class="notice-btn" id="btnAuthSubmit">Activar</button>
+   </div>
+ </div>
 
   <script>
     (function() {
@@ -499,6 +599,7 @@
       const contadorSpan = document.getElementById('contadorFotos');
       const btnAbrirCamara = document.getElementById('btnAbrirCamara');
       const btnEnviar = document.getElementById('btnEnviar');
+      const btnVaciar = document.getElementById('btnVaciar');
       const cameraModal = document.getElementById('cameraModal');
       const video = document.getElementById('videoCam');
       const btnCapturar = document.getElementById('btnCapturar');
@@ -510,6 +611,7 @@
       const MAX_FOTOS = 10;
       let stream = null;
       let capturando = false;
+      let envioFallido = false;
 
       // ---------- IndexedDB ----------
       const DB_NAME = 'GSDCFotos';
@@ -596,6 +698,8 @@
 
         contadorSpan.textContent = `${fotos.length} / ${MAX_FOTOS}`;
         btnAbrirCamara.disabled = fotos.length >= MAX_FOTOS;
+        btnVaciar.hidden = !envioFallido;
+        btnVaciar.disabled = fotos.length === 0;
 
         const destinatarioValido = destinatarioInput.value.trim().length > 0;
         const hayFotos = fotos.length > 0;
@@ -608,6 +712,16 @@
           guardarFotosEnDB();
           actualizarUI();
         }
+      }
+
+      function vaciarFotos() {
+        if (fotos.length === 0) return;
+        if (!window.confirm('¿Vaciar todas las fotos? Se iniciará una entrega nueva.')) return;
+        fotos.length = 0;
+        destinatarioInput.value = '';
+        limpiarFotosEnDB();
+        envioFallido = false;
+        actualizarUI();
       }
 
       function agregarFoto(dataUrl, timestamp = Date.now()) {
@@ -705,6 +819,7 @@
       btnAbrirCamara.addEventListener('click', abrirCamara);
       btnCapturar.addEventListener('click', capturarFoto);
       btnCerrarCamara.addEventListener('click', cerrarCamara);
+      btnVaciar.addEventListener('click', vaciarFotos);
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && cameraModal.classList.contains('active')) cerrarCamara();
       });
@@ -718,7 +833,7 @@
 
         const destinatario = destinatarioInput.value.trim();
         if (!destinatario) {
-          alert('Escribe el destinatario.');
+          alert('Selecciona el destinatario.');
           destinatarioInput.focus();
           return;
         }
@@ -739,7 +854,7 @@
         btnEnviar.disabled = true;
 
         try {
-          const response = await fetch('/.netlify/functions/envio', {
+          const response = await fetchWithAuth('/.netlify/functions/envio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -753,11 +868,13 @@
             fotos.length = 0;
             destinatarioInput.value = '';
             limpiarFotosEnDB();
+            envioFallido = false;
             actualizarUI();
           } else {
             const errBody = await response.text();
             console.error('Netlify Function error:', response.status, errBody);
             const d = /401|403|consent|denied|generalException/i.test(errBody);
+            envioFallido = true;
             if (d) {
               noticeText.textContent =
                 'La conexión con SharePoint aún no está activada por el departamento de IT. ' +
@@ -769,6 +886,7 @@
           }
         } catch (error) {
           console.error(error);
+          envioFallido = true;
           alert('❌ Error de conexión. Revisa tu internet.');
         } finally {
           btnEnviar.classList.remove('loading');
@@ -789,18 +907,120 @@
 
       // ---------- Service Worker ----------
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister());
+        });
+        navigator.serviceWorker.register('/service-worker.js?v=5').then((reg) => {
+          reg.update();
+        }).catch(() => {});
+      }
+
+      // ---------- Clave de activación (almacenada en localStorage) ----------
+      const TOKEN_KEY = 'gsdc_app_token';
+            const authModal = document.getElementById('authModal');
+      const authInput = document.getElementById('authInput');
+      const authError = document.getElementById('authError');
+      const btnAuthSubmit = document.getElementById('btnAuthSubmit');
+
+      function getStoredToken() {
+        try { return localStorage.getItem(TOKEN_KEY); } catch (_) { return null; }
+      }
+      function setStoredToken(v) {
+        try { localStorage.setItem(TOKEN_KEY, v); } catch (_) {}
+      }
+      function clearStoredToken() {
+        try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+      }
+
+      function requireAuth() {
+        if (authError) authError.textContent = '';
+        if (authModal) authModal.classList.add('active');
+        if (authInput) setTimeout(() => authInput.focus(), 50);
+      }
+
+      function activateToken(value) {
+        setStoredToken(value);
+        if (authModal) authModal.classList.remove('active');
+        if (authError) authError.textContent = '';
+        try { comprobarEstadoSharePoint(); } catch (_) {}
+      }
+
+      function bindAuth() {
+        try {
+          if (!authInput || !btnAuthSubmit || !authModal) {
+            console.warn('[auth] Alg\u00fan elemento del modal no se encontr\u00f3 en el DOM', {
+              authInput: !!authInput, btnAuthSubmit: !!btnAuthSubmit, authModal: !!authModal
+            });
+            return;
+          }
+          btnAuthSubmit.addEventListener('click', () => {
+            const v = (authInput.value || '').trim();
+            if (!v) { if (authError) authError.textContent = 'Introduce la clave.'; return; }
+            activateToken(v);
+          });
+          authInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); btnAuthSubmit.click(); }
+          });
+          console.log('[auth] Listeners del modal enganchados correctamente');
+        } catch (err) {
+          console.error('[auth] Error enganchando listeners:', err);
+        }
+      }
+
+      // Delegaci\u00f3n de respaldo a nivel de documento (por si los listeners
+      // directos no llegan a ejecutarse: SW cacheado, re-render, etc.).
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t) return;
+        if (t.id === 'btnAuthSubmit') {
+          if (!authInput) return;
+          const v = (authInput.value || '').trim();
+          if (!v) { if (authError) authError.textContent = 'Introduce la clave.'; return; }
+          activateToken(v);
+        } else if (t.id === 'btnCerrarAviso' && noticeModal) {
+          noticeModal.classList.remove('active');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target && e.target.id === 'authInput') {
+          if (!btnAuthSubmit) return;
+          const v = (e.target.value || '').trim();
+          if (v) activateToken(v);
+        }
+      });
+
+      /**
+       * fetch() con cabecera X-App-Token. Si el server devuelve 401,
+       * borra el token local y vuelve a pedir la clave.
+       */
+      async function fetchWithAuth(url, options) {
+        const token = getStoredToken();
+        const headers = Object.assign({}, options && options.headers || {}, {});
+        if (token) headers['X-App-Token'] = token;
+        const res = await fetch(url, Object.assign({}, options || {}, { headers }));
+        if (res.status === 401) {
+          clearStoredToken();
+          requireAuth();
+          throw new Error('Clave no v\u00e1lida');
+        }
+        return res;
       }
 
       // ---------- Inicializar ----------
       (async function init() {
+        bindAuth();
         try { await abrirDB(); } catch (_) {}
         const fotosGuardadas = await cargarFotosDeDB();
         fotosGuardadas.forEach((foto) => {
           fotos.push(typeof foto === 'string' ? { dataUrl: foto, timestamp: Date.now() } : foto);
         });
         actualizarUI();
-        comprobarEstadoSharePoint();
+        if (getStoredToken()) {
+          if (authModal) authModal.classList.remove('active');
+          comprobarEstadoSharePoint();
+        } else {
+          requireAuth();
+        }
         console.log('📷 App lista. Envío directo a SharePoint vía Netlify Function');
       })();
 
@@ -816,7 +1036,7 @@
 
       async function comprobarEstadoSharePoint() {
         try {
-          const response = await fetch('/.netlify/functions/envio');
+          const response = await fetchWithAuth('/.netlify/functions/envio');
           const data = await response.json();
           if (data && data.listo === false) {
             if (data.consentimiento === false) {
@@ -827,7 +1047,8 @@
             noticeModal.classList.add('active');
             console.warn('Estado SharePoint:', data.motivo);
           }
-        } catch (_) {
+        } catch (e) {
+          if (e && e.message === 'Clave no v\u00e1lida') return;
           // Sin conexión: no mostrar aviso para no bloquear el uso offline
         }
       }
