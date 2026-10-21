@@ -318,7 +318,30 @@
       touch-action: manipulation;
     }
 
-    .photo-item .remove-btn:active { transform: scale(0.85); }
+    .photo-item .enhance-btn {
+      position: absolute;
+      bottom: -6px;
+      left: -6px;
+      width: 24px;
+      height: 24px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 12px;
+      line-height: 24px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(79,70,229,0.3);
+      padding: 0;
+      touch-action: manipulation;
+      z-index: 2;
+    }
+    .photo-item .enhance-btn:active { transform: scale(0.85); }
+    .photo-item .enhance-btn.processing {
+      background: #94a3b8;
+      pointer-events: none;
+    }
 
     .btn-submit {
       width: 100%;
@@ -808,6 +831,19 @@
             });
             item.appendChild(btn);
 
+            // Botón "Mejorar" (solo en módulo Piezas)
+            if (moduloActual === 'pieza') {
+              const btnEnhance = document.createElement('button');
+              btnEnhance.className = 'enhance-btn';
+              btnEnhance.innerHTML = '✨';
+              btnEnhance.setAttribute('aria-label', 'Mejorar foto (fondo blanco)');
+              btnEnhance.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mejorarFoto(index, btnEnhance);
+              });
+              item.appendChild(btnEnhance);
+            }
+
             item.addEventListener('click', () => eliminarFoto(index));
             galeria.appendChild(item);
           });
@@ -861,6 +897,116 @@
         guardarFotosEnDB();
         actualizarUI();
         return true;
+      }
+
+      // ---------- Postprocesado: chroma key + fondo blanco ----------
+      async function mejorarFoto(index, btnEl) {
+        if (index < 0 || index >= fotos.length) return;
+        if (btnEl) {
+          btnEl.classList.add('processing');
+          btnEl.innerHTML = '⏳';
+        }
+
+        try {
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = fotos[index].dataUrl;
+          });
+
+          const w = img.width;
+          const h = img.height;
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const data = imageData.data;
+
+          // 1. Analizar píxeles del borde para detectar fondo uniforme
+          const borderPixels = [];
+          const edgeSize = Math.max(5, Math.min(20, Math.floor(Math.min(w, h) * 0.02)));
+          for (let x = 0; x < w; x++) {
+            for (let e = 0; e < edgeSize; e++) {
+              borderPixels.push((e * w + x) * 4);       // borde superior
+              borderPixels.push(((h - 1 - e) * w + x) * 4); // borde inferior
+            }
+          }
+          for (let y = 0; y < h; y++) {
+            for (let e = 0; e < edgeSize; e++) {
+              borderPixels.push((y * w + e) * 4);       // borde izquierdo
+              borderPixels.push((y * w + (w - 1 - e)) * 4); // borde derecho
+            }
+          }
+
+          // Calcular color promedio y varianza del borde
+          let rSum = 0, gSum = 0, bSum = 0, count = 0;
+          for (const idx of borderPixels) {
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
+            count++;
+          }
+          const rAvg = rSum / count;
+          const gAvg = gSum / count;
+          const bAvg = bSum / count;
+
+          let variance = 0;
+          for (const idx of borderPixels) {
+            const dr = data[idx] - rAvg;
+            const dg = data[idx + 1] - gAvg;
+            const db = data[idx + 2] - bAvg;
+            variance += dr * dr + dg * dg + db * db;
+          }
+          variance = variance / count;
+
+          // Si la varianza es alta, el fondo no es uniforme → no procesar
+          if (variance > 1500) {
+            alert('El fondo no parece uniforme. No se puede procesar automáticamente.');
+            return;
+          }
+
+          // 2. Chroma key: eliminar píxeles similares al color del borde
+          const tolerance = 60;
+          const toleranceSq = tolerance * tolerance;
+          for (let i = 0; i < data.length; i += 4) {
+            const dr = data[i] - rAvg;
+            const dg = data[i + 1] - gAvg;
+            const db = data[i + 2] - bAvg;
+            const distSq = dr * dr + dg * dg + db * db;
+            if (distSq < toleranceSq) {
+              data[i + 3] = 0; // transparente
+            }
+          }
+
+          // 3. Componer sobre fondo blanco
+          ctx.putImageData(imageData, 0, 0);
+          // Crear canvas final con fondo blanco
+          const finalCanvas = document.createElement('canvas');
+          finalCanvas.width = w;
+          finalCanvas.height = h;
+          const finalCtx = finalCanvas.getContext('2d');
+          finalCtx.fillStyle = '#ffffff';
+          finalCtx.fillRect(0, 0, w, h);
+          finalCtx.drawImage(canvas, 0, 0);
+
+          // 4. Reemplazar la foto
+          const newDataUrl = finalCanvas.toDataURL('image/jpeg', 0.7);
+          fotos[index].dataUrl = newDataUrl;
+          guardarFotosEnDB();
+          actualizarUI();
+        } catch (err) {
+          console.error('Error al mejorar foto:', err);
+          alert('No se pudo mejorar la foto.');
+        } finally {
+          if (btnEl) {
+            btnEl.classList.remove('processing');
+            btnEl.innerHTML = '✨';
+          }
+        }
       }
 
       // ---------- Cámara ----------
