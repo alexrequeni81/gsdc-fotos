@@ -1,0 +1,28 @@
+﻿# Dependencias
+node_modules/
+vendor/
+
+# Entornos y secretos
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Netlify
+.netlify/
+
+# Build / salida
+dist/
+build/
+out/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fotos Envíos GSDC</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon-192.svg" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="GSDC Fotos" />
+  <link rel="apple-touch-icon" href="icon-192.svg" />
+  <style>
+    /* Reset & base */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 480px;
+      background: #ffffff;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 24px 20px 32px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 96px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .app-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1e293b;
+      letter-spacing: -0.3px;
+    }
+
+    .app-header .badge {
+      background: #eef2ff;
+      color: #4f46e5;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 30px;
+      margin-left: auto;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .form-group label .required {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+
+    .form-group input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 16px;
+      background: #fafbfc;
+      transition: border 0.2s, box-shadow 0.2s;
+      outline: none;
+      color: #0f172a;
+    }
+
+    .form-group input[type="text"]:focus {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
+      background: #ffffff;
+    }
+
+    .photo-section {
+      border: 2px dashed #d1d5db;
+      border-radius: 20px;
+      padding: 20px 16px 16px;
+      background: #fafbfc;
+    }
+
+    .photo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .photo-header label {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 15px;
+      margin: 0;
+    }
+
+    .photo-header .counter {
+      font-size: 14px;
+      font-weight: 500;
+      color: #64748b;
+      background: #eef2f6;
+      padding: 2px 14px;
+      border-radius: 30px;
+    }
+
+    .photo-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .btn-camera {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 14px 22px;
+      border-radius: 60px;
+      font-size: 16px;
+      font-weight: 600;
+      flex: 1;
+      min-width: 140px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 12px rgba(79,70,229,0.25);
+      touch-action: manipulation;
+    }
+
+    .btn-camera:active { transform: scale(0.96); background: #4338ca; }
+    .btn-camera:disabled { opacity: 0.5; pointer-events: none; box-shadow: none; }
+
+    .gallery {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-height: 60px;
+      align-items: flex-start;
+    }
+
+    .gallery .empty-msg {
+      color: #94a3b8;
+      font-size: 14px;
+      padding: 8px 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    .photo-item {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      background: #eef2f6;
+      flex-shrink: 0;
+      border: 2px solid white;
+      cursor: pointer;
+    }
+
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-item .remove-btn {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 24px;
+      height: 24px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 14px;
+      line-height: 24px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(239,68,68,0.3);
+      padding: 0;
+      touch-action: manipulation;
+    }
+
+    .photo-item .remove-btn:active { transform: scale(0.85); }
+
+    .btn-submit {
+      width: 100%;
+      padding: 16px;
+      background: #0f172a;
+      color: white;
+      border: none;
+      border-radius: 60px;
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 28px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s, opacity 0.2s;
+      box-shadow: 0 4px 14px rgba(15,23,42,0.2);
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-submit:active { transform: scale(0.97); background: #1e293b; }
+    .btn-submit:disabled {
+      opacity: 0.4;
+      pointer-events: none;
+      background: #94a3b8;
+    }
+
+    .btn-submit .spinner {
+      display: none;
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .btn-submit.loading .spinner { display: inline-block; }
+    .btn-submit.loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Modal cámara */
+    .camera-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+      animation: fadeIn 0.25s ease;
+    }
+
+    .camera-modal.active { display: flex; }
+
+    .camera-modal .camera-box {
+      width: 100%;
+      max-width: 480px;
+      background: #000;
+      border-radius: 32px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    .camera-modal video {
+      width: 100%;
+      display: block;
+      aspect-ratio: 4 / 3;
+      background: #111;
+      object-fit: cover;
+    }
+
+    .camera-modal .camera-controls {
+      display: flex;
+      gap: 16px;
+      padding: 20px 16px 24px;
+      background: #000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .camera-modal .cam-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 60px;
+      border: none;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.1s;
+      flex: 1;
+      max-width: 180px;
+    }
+
+    .camera-modal .cam-btn:active { transform: scale(0.94); }
+    .camera-modal .cam-btn.capture {
+      background: #4f46e5;
+      color: white;
+      box-shadow: 0 4px 16px rgba(79,70,229,0.4);
+    }
+    .camera-modal .cam-btn.close-cam {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+    .camera-modal .cam-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .text-muted {
+      color: #64748b;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    /* Toast de confirmación */
+    .toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0f172a;
+      color: white;
+      padding: 14px 28px;
+      border-radius: 60px;
+      font-weight: 600;
+      font-size: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Modal de aviso (pendiente autorización IT) */
+    .notice-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .notice-modal.active { display: flex; }
+
+    .notice-box {
+      background: #ffffff;
+      border-radius: 20px;
+      max-width: 380px;
+      width: 100%;
+      padding: 24px 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    .notice-box .notice-icon {
+      font-size: 44px;
+      margin-bottom: 12px;
+    }
+
+    .notice-box h2 {
+      font-size: 19px;
+      color: #0f172a;
+      margin-bottom: 10px;
+    }
+
+    .notice-box p {
+      font-size: 15px;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    .notice-box .notice-btn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 12px 26px;
+      border-radius: 60px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 480px) {
+      .app { padding: 20px 16px 84px; }
+      .photo-item { width: 70px; height: 70px; }
+      .btn-camera { font-size: 15px; padding: 12px 16px; }
+      .camera-modal .cam-btn { font-size: 15px; padding: 12px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="app-header">
+      <h1>📷 Fotos Envíos</h1>
+      <span class="badge">GSDC</span>
+    </div>
+
+    <form id="formulario" novalidate style="display:flex; flex-direction:column; flex:1;">
+      <div class="form-group">
+        <label for="destinatario">Destinatario (lugar) <span class="required">*</span></label>
+        <input type="text" id="destinatario" placeholder="Ej: Jefferson, Fresno..." required autocomplete="off" />
+      </div>
+
+      <div class="form-group photo-section" style="flex:1;">
+        <div class="photo-header">
+          <label>Añadir fotos <span class="required">*</span></label>
+          <span class="counter" id="contadorFotos">0 / 10</span>
+        </div>
+        <div class="photo-actions">
+          <button type="button" class="btn-camera" id="btnAbrirCamara">
+            <span>📸</span> Tomar foto
+          </button>
+        </div>
+        <div class="gallery" id="galeria">
+          <div class="empty-msg">Todavía no hay fotos</div>
+        </div>
+        <div class="text-muted">Máximo 10 fotos · Toca una foto para eliminarla</div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="btnEnviar" disabled>
+        <span class="btn-text">✉️ Enviar</span>
+        <span class="spinner"></span>
+      </button>
+    </form>
+
+    </div>
+
+  <!-- Modal cámara -->
+  <div class="camera-modal" id="cameraModal">
+    <div class="camera-box">
+      <video id="videoCam" autoplay playsinline></video>
+      <div class="camera-controls">
+        <button class="cam-btn close-cam" id="btnCerrarCamara">✕ Cerrar</button>
+        <button class="cam-btn capture" id="btnCapturar">📸 Capturar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de confirmación -->
+  <div id="toast" class="toast">✅ Envío completado</div>
+
+  <!-- Modal de aviso: pendiente autorización IT -->
+  <div class="notice-modal" id="noticeModal">
+    <div class="notice-box">
+      <div class="notice-icon">⏳</div>
+      <h2>Pendiente autorización IT</h2>
+      <p id="noticeText">La conexión con SharePoint aún no está activada por el departamento de IT. Podrás tomar las fotos, pero no se podrán guardar en SharePoint hasta que se conceda el permiso.</p>
+      <button class="notice-btn" id="btnCerrarAviso">Entendido</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // ---------- DOM ----------
+      const destinatarioInput = document.getElementById('destinatario');
+      const galeria = document.getElementById('galeria');
+      const contadorSpan = document.getElementById('contadorFotos');
+      const btnAbrirCamara = document.getElementById('btnAbrirCamara');
+      const btnEnviar = document.getElementById('btnEnviar');
+      const cameraModal = document.getElementById('cameraModal');
+      const video = document.getElementById('videoCam');
+      const btnCapturar = document.getElementById('btnCapturar');
+      const btnCerrarCamara = document.getElementById('btnCerrarCamara');
+      const toast = document.getElementById('toast');
+
+      // ---------- Estado ----------
+      const fotos = []; // { dataUrl, timestamp }
+      const MAX_FOTOS = 10;
+      let stream = null;
+      let capturando = false;
+
+      // ---------- IndexedDB ----------
+      const DB_NAME = 'GSDCFotos';
+      const DB_VERSION = 1;
+      const STORE_NAME = 'fotos';
+      let db = null;
+
+      function abrirDB() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onupgradeneeded = (e) => {
+            const database = e.target.result;
+            if (!database.objectStoreNames.contains(STORE_NAME)) {
+              database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            }
+          };
+          request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+          request.onerror = (e) => { console.error('IndexedDB error:', e); reject(e); };
+        });
+      }
+
+      function guardarFotosEnDB() {
+        if (!db) return;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.clear();
+        fotos.forEach((foto, i) => {
+          store.add({ id: i + 1, dataUrl: foto.dataUrl, timestamp: foto.timestamp });
+        });
+      }
+
+      function cargarFotosDeDB() {
+        return new Promise((resolve) => {
+          if (!db) { resolve([]); return; }
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.getAll();
+          request.onsuccess = () => {
+            const results = request.result || [];
+            results.sort((a, b) => a.id - b.id);
+            resolve(results.map((r) => ({ dataUrl: r.dataUrl, timestamp: r.timestamp || Date.now() })));
+          };
+          request.onerror = () => resolve([]);
+        });
+      }
+
+      function limpiarFotosEnDB() {
+        if (!db) return;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).clear();
+      }
+
+      // ---------- Actualizar interfaz ----------
+      function actualizarUI() {
+        galeria.innerHTML = '';
+        if (fotos.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-msg';
+          empty.textContent = 'Todavía no hay fotos';
+          galeria.appendChild(empty);
+        } else {
+          fotos.forEach((foto, index) => {
+            const item = document.createElement('div');
+            item.className = 'photo-item';
+            const img = document.createElement('img');
+            img.src = foto.dataUrl;
+            img.alt = `Foto ${index+1}`;
+            item.appendChild(img);
+
+            const btn = document.createElement('button');
+            btn.className = 'remove-btn';
+            btn.innerHTML = '×';
+            btn.setAttribute('aria-label', 'Eliminar foto');
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              eliminarFoto(index);
+            });
+            item.appendChild(btn);
+
+            item.addEventListener('click', () => eliminarFoto(index));
+            galeria.appendChild(item);
+          });
+        }
+
+        contadorSpan.textContent = `${fotos.length} / ${MAX_FOTOS}`;
+        btnAbrirCamara.disabled = fotos.length >= MAX_FOTOS;
+
+        const destinatarioValido = destinatarioInput.value.trim().length > 0;
+        const hayFotos = fotos.length > 0;
+        btnEnviar.disabled = !(destinatarioValido && hayFotos);
+      }
+
+      function eliminarFoto(index) {
+        if (index >= 0 && index < fotos.length) {
+          fotos.splice(index, 1);
+          guardarFotosEnDB();
+          actualizarUI();
+        }
+      }
+
+      function agregarFoto(dataUrl, timestamp = Date.now()) {
+        if (fotos.length >= MAX_FOTOS) {
+          alert(`Máximo ${MAX_FOTOS} fotos permitidas.`);
+          return false;
+        }
+        fotos.push({ dataUrl, timestamp });
+        guardarFotosEnDB();
+        actualizarUI();
+        return true;
+      }
+
+      // ---------- Cámara ----------
+      async function abrirCamara() {
+        if (fotos.length >= MAX_FOTOS) {
+          alert(`Ya has alcanzado el límite de ${MAX_FOTOS} fotos.`);
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Cámara no disponible.\n\nCausa probable: la app debe ejecutarse por HTTPS o localhost.\nSi estás en una red local (http://192.168...), despliégala en un hosting con HTTPS (Netlify, Vercel, GitHub Pages).');
+          return;
+        }
+        try {
+          const constraints = {
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = stream;
+          await video.play();
+          cameraModal.classList.add('active');
+          btnCapturar.disabled = false;
+          capturando = false;
+        } catch (err) {
+          console.error(err);
+          let msg = 'No se pudo acceder a la cámara.';
+          if (err.name === 'NotAllowedError') {
+            msg += '\n\nPermiso denegado. Ve a Ajustes → Chrome → Permisos → Cámara y actívala para este sitio.';
+          } else if (err.name === 'NotFoundError') {
+            msg += '\n\nNo se encontró cámara en el dispositivo.';
+          } else {
+            msg += `\n\nError: ${err.message}`;
+          }
+          alert(msg);
+        }
+      }
+
+      function cerrarCamara() {
+        cameraModal.classList.remove('active');
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+        video.srcObject = null;
+        btnCapturar.disabled = true;
+        capturando = false;
+      }
+
+      function capturarFoto() {
+        if (capturando) return;
+        if (!stream || !video.videoWidth) {
+          alert('La cámara no está lista.');
+          return;
+        }
+        capturando = true;
+        btnCapturar.disabled = true;
+
+        const canvas = document.createElement('canvas');
+        const maxDim = 1024;
+        let w = video.videoWidth;
+        let h = video.videoHeight;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, w, h);
+        const timestamp = Date.now();
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+        const ok = agregarFoto(dataUrl, timestamp);
+        if (ok) {
+          cerrarCamara();
+        } else {
+          btnCapturar.disabled = false;
+          capturando = false;
+        }
+      }
+
+      // ---------- Eventos cámara ----------
+      btnAbrirCamara.addEventListener('click', abrirCamara);
+      btnCapturar.addEventListener('click', capturarFoto);
+      btnCerrarCamara.addEventListener('click', cerrarCamara);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && cameraModal.classList.contains('active')) cerrarCamara();
+      });
+      cameraModal.addEventListener('click', (e) => {
+        if (e.target === cameraModal) cerrarCamara();
+      });
+
+      // ---------- Envío asíncrono a SharePoint ----------
+      document.getElementById('formulario').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const destinatario = destinatarioInput.value.trim();
+        if (!destinatario) {
+          alert('Escribe el destinatario.');
+          destinatarioInput.focus();
+          return;
+        }
+        if (fotos.length === 0) {
+          alert('Debes tomar al menos una foto.');
+          return;
+        }
+
+        const payload = {
+          destinatario: destinatario,
+          fotos: fotos.map((foto) => ({
+            dataUrl: foto.dataUrl,
+            fecha: formatFechaLocal(foto.timestamp)
+          }))
+        };
+
+        btnEnviar.classList.add('loading');
+        btnEnviar.disabled = true;
+
+        try {
+          const response = await fetch('/.netlify/functions/envio', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            toast.textContent = '✅ Envío completado';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+
+            fotos.length = 0;
+            destinatarioInput.value = '';
+            limpiarFotosEnDB();
+            actualizarUI();
+          } else {
+            const errBody = await response.text();
+            console.error('Netlify Function error:', response.status, errBody);
+            const d = /401|403|consent|denied|generalException/i.test(errBody);
+            if (d) {
+              noticeText.textContent =
+                'La conexión con SharePoint aún no está activada por el departamento de IT. ' +
+                'Tus fotos no se han podido guardar. Vuelve a intentarlo cuando IT confirme la autorización.';
+              noticeModal.classList.add('active');
+            } else {
+              alert(`❌ Error ${response.status} al enviar.\n\n${errBody || 'Sin detalle'}`);
+            }
+          }
+        } catch (error) {
+          console.error(error);
+          alert('❌ Error de conexión. Revisa tu internet.');
+        } finally {
+          btnEnviar.classList.remove('loading');
+          btnEnviar.disabled = true;
+          actualizarUI();
+        }
+      });
+
+      // ---------- Utilidades ----------
+      function formatFechaLocal(ts) {
+        const d = new Date(ts);
+        const p = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      }
+
+      // ---------- Evento input ----------
+      destinatarioInput.addEventListener('input', actualizarUI);
+
+      // ---------- Service Worker ----------
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+      }
+
+      // ---------- Inicializar ----------
+      (async function init() {
+        try { await abrirDB(); } catch (_) {}
+        const fotosGuardadas = await cargarFotosDeDB();
+        fotosGuardadas.forEach((foto) => {
+          fotos.push(typeof foto === 'string' ? { dataUrl: foto, timestamp: Date.now() } : foto);
+        });
+        actualizarUI();
+        comprobarEstadoSharePoint();
+        console.log('📷 App lista. Envío directo a SharePoint vía Netlify Function');
+      })();
+
+      // ---------- Estado de la conexión con SharePoint ----------
+      const noticeModal = document.getElementById('noticeModal');
+      const noticeText = document.getElementById('noticeText');
+      document.getElementById('btnCerrarAviso').addEventListener('click', () => {
+        noticeModal.classList.remove('active');
+      });
+      noticeModal.addEventListener('click', (e) => {
+        if (e.target === noticeModal) noticeModal.classList.remove('active');
+      });
+
+      async function comprobarEstadoSharePoint() {
+        try {
+          const response = await fetch('/.netlify/functions/envio');
+          const data = await response.json();
+          if (data && data.listo === false) {
+            if (data.consentimiento === false) {
+              noticeText.textContent =
+                'Hay un problema de configuración en la conexión con SharePoint. ' +
+                'Toma las fotos con normalidad, pero no se podrán guardar hasta que IT lo revise.';
+            }
+            noticeModal.classList.add('active');
+            console.warn('Estado SharePoint:', data.motivo);
+          }
+        } catch (_) {
+          // Sin conexión: no mostrar aviso para no bloquear el uso offline
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
