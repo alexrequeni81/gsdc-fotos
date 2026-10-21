@@ -107,6 +107,21 @@ AdemÃ¡s expone un **health check** en `GET` que devuelve:
 
 ---
 
+## Módulos de la aplicación
+
+La app tiene dos módulos seleccionables mediante pestañas en la parte superior:
+
+### Envíos (módulo original)
+- Destinatario: selector con 9 opciones (Jefferson, Wonderful, Fresno, Vidalia, Giro GMBH, Giro Italia, Filpack, Lawtons/Xact, EDP).
+- Fotos se guardan en: `FotosEnvios / {Destinatario} / {AAAAMMDD}`.
+- Nombre de archivo: `AAAAMMDD_HHMMSS_00N_Destinatario.jpg`.
+
+### Piezas (nuevo módulo)
+- Código de pieza: campo de texto libre (sin validación contra lista).
+- Fotos se guardan en: `Fotos piezas /` (todas juntas, sin subcarpeta por código).
+- Nombre de archivo: `{CódigoPieza}.jpg` (solo el código, sin fecha ni contador).
+- Máx. 10 fotos por envío (aunque en principio con una basta).
+
 ## ConfiguraciÃ³n de Netlify
 
 ### Variables de entorno requeridas

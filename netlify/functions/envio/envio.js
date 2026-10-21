@@ -289,11 +289,7 @@ exports.handler = async function (event) {
 
     // --- Lectura y validación del payload ---
     const payload = JSON.parse(event.body || '{}');
-    const destinatario = String(payload.destinatario || '').trim().replace(/\s+/g, ' ');
-
-    if (!ALLOWED_DESTINATARIOS.has(destinatario.toLowerCase())) {
-      return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Destinatario no permitido' }) };
-    }
+    const tipo = String(payload.tipo || 'envio').trim().toLowerCase();
 
     const fotos = Array.isArray(payload.fotos) ? payload.fotos.filter(f => f && f.dataUrl) : [];
 
@@ -308,19 +304,44 @@ exports.handler = async function (event) {
     const token = await getGraphToken();
     const driveId = await getDriveId(token);
 
-    const baseFolder = (process.env.BASE_FOLDER || 'General/Información entre ALZ y BDN/FotosEnvios')
-      .split('/').map(s => s.trim()).filter(Boolean);
+    let baseFolder, segments, nombreArchivoFn;
 
-    // Carpeta día (AAAAMMDD) a partir de la fecha de la primera foto.
-    const dia = String(fotos[0].fecha || '').trim().slice(0, 10);
-    const yyyymmdd = dia.replace(/-/g, '');
-    // El destinatario se sanea para SharePoint (p. ej. "Lawtons/Xact" -> "Lawtons_Xact").
-    const nombreCarpeta = sanitizarNombre(destinatario);
-    const segments = [...baseFolder, nombreCarpeta, yyyymmdd];
-    await ensureFolder(token, driveId, segments);
+    if (tipo === 'pieza') {
+      // --- Módulo Piezas: código de pieza, sin fecha, sin subcarpeta ---
+      const codigoPieza = String(payload.codigoPieza || '').trim().replace(/\s+/g, ' ');
+      if (!codigoPieza) {
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Código de pieza obligatorio' }) };
+      }
+      const codigoSaneado = sanitizarNombre(codigoPieza);
+
+      baseFolder = (process.env.PIEZAS_FOLDER || 'General/Fotos piezas')
+        .split('/').map(s => s.trim()).filter(Boolean);
+      segments = [...baseFolder]; // sin subcarpeta por código
+      await ensureFolder(token, driveId, segments);
+
+      nombreArchivoFn = (mime, ext) => `${codigoSaneado}.${ext}`;
+    } else {
+      // --- Módulo Envíos: flujo actual ---
+      const destinatario = String(payload.destinatario || '').trim().replace(/\s+/g, ' ');
+
+      if (!ALLOWED_DESTINATARIOS.has(destinatario.toLowerCase())) {
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Destinatario no permitido' }) };
+      }
+
+      baseFolder = (process.env.BASE_FOLDER || 'General/Información entre ALZ y BDN/FotosEnvios')
+        .split('/').map(s => s.trim()).filter(Boolean);
+
+      const dia = String(fotos[0].fecha || '').trim().slice(0, 10);
+      const yyyymmdd = dia.replace(/-/g, '');
+      const nombreCarpeta = sanitizarNombre(destinatario);
+      segments = [...baseFolder, nombreCarpeta, yyyymmdd];
+      await ensureFolder(token, driveId, segments);
+
+      const nombreCliente = nombreCarpeta.replace(/\s+/g, '_');
+      nombreArchivoFn = (mime, ext, marca, contador) => `${marca}_${contador}_${nombreCliente}.${ext}`;
+    }
 
     // --- Subida de cada foto ---
-    const nombreCliente = nombreCarpeta.replace(/\s+/g, '_');
     const dirPath = encodeURIComponent(segments.join('/')).replace(/%2F/g, '/');
     const subidos = [];
     const fallidos = [];
@@ -328,9 +349,8 @@ exports.handler = async function (event) {
     for (let i = 0; i < fotos.length; i++) {
       const foto = fotos[i];
 
-      // Marca temporal AAAAMMDD_HHMMSS a partir de la fecha de captura.
-      let fecha = String(foto.fecha || '').trim();
       let marca = 'sinfecha';
+      let fecha = String(foto.fecha || '').trim();
       if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(fecha)) {
         marca = fecha.slice(0, 10).replace(/-/g, '') + '_' + fecha.slice(11).replace(/:/g, '');
       }
@@ -353,8 +373,14 @@ exports.handler = async function (event) {
         fallidos.push({ nombre: 'foto_' + contador, error: 'Foto demasiado grande (' + buffer.length + ' bytes)' }); continue;
       }
 
-      // Nombre final: AAAAMMDD_HHMMSS_00N_Destinatario.jpg
-      const nombre = `${marca}_${contador}_${nombreCliente}.${ext}`;
+      // Nombre final
+      let nombre;
+      if (tipo === 'pieza') {
+        nombre = nombreArchivoFn(mime, ext);
+      } else {
+        nombre = nombreArchivoFn(mime, ext, marca, contador);
+      }
+
       const fileUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${dirPath}/${encodeURIComponent(nombre)}:/content?@microsoft.graph.conflictBehavior=replace`;
 
       try {
@@ -365,15 +391,16 @@ exports.handler = async function (event) {
         });
         subidos.push({ nombre, tamano: buffer.length });
       } catch (err) {
-        // Se recoge el error por foto y se continúa con las demás.
         fallidos.push({ nombre, error: err.message });
       }
     }
 
+    const dia = tipo === 'pieza' ? null : String(fotos[0].fecha || '').trim().slice(0, 10).replace(/-/g, '');
+
     return {
       statusCode: 200,
       headers: CORS,
-      body: JSON.stringify({ ok: true, destinatario, dia: yyyymmdd, subidos, fallidos })
+      body: JSON.stringify({ ok: true, tipo, dia, subidos, fallidos })
     };
   } catch (err) {
     return {
