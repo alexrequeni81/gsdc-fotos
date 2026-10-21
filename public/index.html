@@ -940,6 +940,11 @@
             codigoPiezaInput.focus();
             return;
           }
+          if (!esCodigoPiezaValido(codigoPieza)) {
+            alert('El código de pieza no es válido. Verifica que esté en la lista.');
+            codigoPiezaInput.focus();
+            return;
+          }
         } else {
           if (!destinatario) {
             alert('Selecciona el destinatario.');
@@ -1025,17 +1030,19 @@
         return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
       }
 
-      // ---------- Carga de códigos de piezas (autocompletado) ----------
+      // ---------- Carga de códigos de piezas (autocompletado + validación) ----------
+      let codigosPiezas = [];
       async function cargarCodigosPiezas() {
         try {
           const res = await fetch('/piezas.json');
           if (!res.ok) return;
           const codigos = await res.json();
+          if (!Array.isArray(codigos)) return;
+          codigosPiezas = codigos.map(c => String(c).trim());
           const datalist = document.getElementById('listaPiezas');
-          if (!datalist || !Array.isArray(codigos)) return;
-          // Limitar a 5000 opciones para no saturar el DOM
+          if (!datalist) return;
           const fragment = document.createDocumentFragment();
-          codigos.slice(0, 5000).forEach((codigo) => {
+          codigosPiezas.slice(0, 5000).forEach((codigo) => {
             const option = document.createElement('option');
             option.value = codigo;
             fragment.appendChild(option);
@@ -1044,6 +1051,11 @@
         } catch (e) {
           console.warn('No se pudo cargar piezas.json:', e);
         }
+      }
+
+      function esCodigoPiezaValido(codigo) {
+        if (codigosPiezas.length === 0) return true; // si no se cargó la lista, se permite
+        return codigosPiezas.some(c => c.toLowerCase() === codigo.toLowerCase());
       }
 
       // ---------- Service Worker ----------

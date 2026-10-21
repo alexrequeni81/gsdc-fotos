@@ -36,8 +36,21 @@ const ALLOWED_DESTINATARIOS = new Set([
   'edp'
 ]);
 
-// Tamaño máximo del cuerpo JSON aceptado por la función (~6 MB Netlify).
-const MAX_BODY_BYTES = 6 * 1024 * 1024;
+// --- Lista de códigos de piezas válidos (cargada desde piezas.json) ---
+let codigosPiezasValidos = null;
+function getCodigosPiezas() {
+  if (codigosPiezasValidos) return codigosPiezasValidos;
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const raw = fs.readFileSync(path.join(__dirname, 'piezas.json'), 'utf8');
+    const arr = JSON.parse(raw);
+    codigosPiezasValidos = new Set(Array.isArray(arr) ? arr.map(c => String(c).trim().toLowerCase()) : []);
+  } catch (e) {
+    codigosPiezasValidos = new Set(); // si no se puede cargar, se permite todo (modo dev)
+  }
+  return codigosPiezasValidos;
+}
 // Tamaño máximo por foto decodificada (~1.5 MB).
 const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
 
@@ -313,6 +326,12 @@ exports.handler = async function (event) {
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Código de pieza obligatorio' }) };
       }
       const codigoSaneado = sanitizarNombre(codigoPieza);
+
+      // Validación contra la lista de códigos (si está disponible)
+      const codigos = getCodigosPiezas();
+      if (codigos.size > 0 && !codigos.has(codigoPieza.toLowerCase())) {
+        return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Código de pieza no válido' }) };
+      }
 
       baseFolder = (process.env.PIEZAS_FOLDER || 'General/Fotos piezas')
         .split('/').map(s => s.trim()).filter(Boolean);
