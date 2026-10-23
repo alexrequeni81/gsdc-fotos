@@ -463,6 +463,56 @@
     }
     .camera-modal .cam-btn:disabled { opacity: 0.5; pointer-events: none; }
 
+    /* Cámara en modo Piezas: visor cuadrado con guía (lo que ves es lo que se captura) */
+    .cam-viewport { position: relative; }
+    .camera-modal.square video { aspect-ratio: 1 / 1; }
+    .cam-guide {
+      position: absolute; inset: 8%;
+      border: 2px dashed rgba(255,255,255,0.8);
+      border-radius: 14px; pointer-events: none;
+      box-shadow: 0 0 0 999px rgba(0,0,0,0.28);
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .cam-guide[hidden] { display: none; }
+    .cam-guide span {
+      font-size: 12px; color: #fff; background: rgba(0,0,0,0.5);
+      padding: 3px 10px; border-radius: 10px; margin-bottom: 8px;
+    }
+
+    /* Botones extra de la miniatura: deshacer y marca de "mejorada" */
+    .photo-item .undo-btn {
+      position: absolute; bottom: -6px; right: -6px;
+      width: 24px; height: 24px; background: #475569; color: #fff;
+      border: none; border-radius: 50%; font-size: 13px; line-height: 24px;
+      text-align: center; cursor: pointer; padding: 0; z-index: 2;
+      box-shadow: 0 2px 6px rgba(71,85,105,0.3); touch-action: manipulation;
+    }
+    .photo-item .mejorada-tag {
+      position: absolute; top: 4px; left: 4px; background: rgba(79,70,229,0.92);
+      color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px;
+      border-radius: 8px; pointer-events: none; z-index: 2;
+    }
+
+    /* Vista previa de mejora */
+    .mejora-box { max-width: 460px; }
+    .mejora-compare { display: flex; gap: 10px; margin-bottom: 12px; }
+    .mejora-compare figure { flex: 1; margin: 0; }
+    .mejora-compare img {
+      width: 100%; aspect-ratio: 1 / 1; object-fit: contain; display: block;
+      border-radius: 12px; background: #eef2f6; border: 1px solid #e2e8f0;
+    }
+    .mejora-compare figcaption { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .mejora-chips { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .mejora-chips .chip {
+      border: 1.5px solid #e2e8f0; background: #fff; color: #334155;
+      padding: 7px 14px; border-radius: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .mejora-chips .chip.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+    .mejora-chips .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+    .notice-box p.mejora-info { font-size: 13px; min-height: 36px; margin-bottom: 14px; }
+    .mejora-info.aviso { color: #b45309; }
+    .mejora-info.mala { color: #dc2626; }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.96); }
       to { opacity: 1; transform: scale(1); }
@@ -673,7 +723,10 @@
   <!-- Modal cámara -->
   <div class="camera-modal" id="cameraModal">
     <div class="camera-box">
-      <video id="videoCam" autoplay playsinline></video>
+      <div class="cam-viewport">
+        <video id="videoCam" autoplay playsinline></video>
+        <div class="cam-guide" id="camGuide" hidden><span>Llena el recuadro con la pieza</span></div>
+      </div>
       <div class="camera-controls">
         <button class="cam-btn close-cam" id="btnCerrarCamara">✕ Cerrar</button>
         <button class="cam-btn capture" id="btnCapturar">📸 Capturar</button>
@@ -704,7 +757,30 @@
         <button class="notice-btn" id="btnValidacionCancelar" style="background:#f3f4f6;color:#374151;">Cancelar</button>
         <button class="notice-btn" id="btnValidacionEnviar">Enviar de todos modos</button>
       </div>
+    </div>
+  </div><!-- cierre de #validacionModal (faltaba en el original: dejaba #authModal anidado y oculto) -->
+  <!-- Modal: vista previa de la mejora "catálogo" (solo módulo Piezas) -->
+  <div class="notice-modal" id="mejoraModal">
+    <div class="notice-box mejora-box">
+      <h2>✨ Mejorar foto</h2>
+      <div class="mejora-compare">
+        <figure><img id="mejoraAntes" alt="Antes"><figcaption>Antes</figcaption></figure>
+        <figure><img id="mejoraDespues" alt="Después"><figcaption id="mejoraCaption">Después</figcaption></figure>
+      </div>
+      <div class="mejora-chips" id="mejoraChips">
+        <button type="button" class="chip active" data-metodo="auto">Auto</button>
+        <button type="button" class="chip" data-metodo="blanquear">Blanquear</button>
+        <button type="button" class="chip" data-metodo="recortar">Recortar</button>
+        <!-- FASE 2 (modo preciso, pendiente): <button type="button" class="chip" data-metodo="preciso">🎯 Preciso</button> -->
+      </div>
+      <p class="mejora-info" id="mejoraInfo"></p>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button type="button" class="notice-btn" id="btnMejoraCancelar" style="background:#f3f4f6;color:#374151;">Cancelar</button>
+        <button type="button" class="notice-btn" id="btnMejoraAplicar" disabled>Aplicar</button>
+      </div>
+    </div>
   </div>
+
   <div class="notice-modal active" id="authModal">
     <div class="notice-box">
       <div class="notice-icon">🔐</div>
@@ -716,6 +792,7 @@
    </div>
  </div>
 
+  <script src="/foto-mejora.js"></script>
   <script>
     (function() {
       'use strict';
@@ -739,6 +816,15 @@
       const btnCapturar = document.getElementById('btnCapturar');
       const btnCerrarCamara = document.getElementById('btnCerrarCamara');
       const toast = document.getElementById('toast');
+      const camGuide = document.getElementById('camGuide');
+      const mejoraModal = document.getElementById('mejoraModal');
+      const mejoraAntes = document.getElementById('mejoraAntes');
+      const mejoraDespues = document.getElementById('mejoraDespues');
+      const mejoraCaption = document.getElementById('mejoraCaption');
+      const mejoraInfo = document.getElementById('mejoraInfo');
+      const mejoraChips = document.getElementById('mejoraChips');
+      const btnMejoraAplicar = document.getElementById('btnMejoraAplicar');
+      const btnMejoraCancelar = document.getElementById('btnMejoraCancelar');
 
       const authModal = document.getElementById('authModal');
       const authInput = document.getElementById('authInput');
@@ -746,8 +832,18 @@
       const btnAuthSubmit = document.getElementById('btnAuthSubmit');
 
       // ---------- Estado ----------
-      const fotos = []; // { dataUrl, timestamp }
+      const fotos = []; // { dataUrl, timestamp, original?, mejora? }  (original/mejora solo viven en el dispositivo)
       const MAX_FOTOS = 10;
+
+      // Ajustes de captura y mejora. Ver README.md → "Parámetros ajustables".
+      const CONFIG = {
+        envios: { captura: { maxLado: 1024, calidad: 0.70, cuadrada: false } },   // comportamiento original
+        piezas: {
+          captura: { maxLado: 1280, calidad: 0.88, cuadrada: true },              // visor cuadrado con guía
+          mejora:  { salida: 1200, calidadJpeg: 0.90, margen: 0.09, sombra: 0.8 } // ver foto-mejora.js → DEFAULTS
+        },
+        maxPayloadBytes: 5.5 * 1024 * 1024   // las Netlify Functions rechazan cuerpos > ~6 MB
+      };
       let stream = null;
       let capturando = false;
       let envioFallido = false;
@@ -787,7 +883,7 @@
         const store = tx.objectStore(storeActual());
         store.clear();
         fotos.forEach((foto, i) => {
-          store.add({ id: i + 1, dataUrl: foto.dataUrl, timestamp: foto.timestamp });
+          store.add({ id: i + 1, dataUrl: foto.dataUrl, timestamp: foto.timestamp, original: foto.original || null, mejora: foto.mejora || null });
         });
       }
 
@@ -800,7 +896,11 @@
           request.onsuccess = () => {
             const results = request.result || [];
             results.sort((a, b) => a.id - b.id);
-            resolve(results.map((r) => ({ dataUrl: r.dataUrl, timestamp: r.timestamp || Date.now() })));
+            resolve(results.map((r) => {
+              const f = { dataUrl: r.dataUrl, timestamp: r.timestamp || Date.now() };
+              if (r.original) { f.original = r.original; f.mejora = r.mejora || { metodo: '?' }; }
+              return f;
+            }));
           };
           request.onerror = () => resolve([]);
         });
@@ -839,17 +939,36 @@
             });
             item.appendChild(btn);
 
-            // Botón "Mejorar" (solo en módulo Piezas)
+            // Botones de mejora (solo en módulo Piezas): ✨ abre la vista previa, ↩ restaura el original
             if (moduloActual === 'pieza') {
               const btnEnhance = document.createElement('button');
+              btnEnhance.type = 'button';
               btnEnhance.className = 'enhance-btn';
               btnEnhance.innerHTML = '✨';
-              btnEnhance.setAttribute('aria-label', 'Mejorar foto (fondo blanco)');
+              btnEnhance.setAttribute('aria-label', 'Mejorar foto (fondo blanco, formato catálogo)');
               btnEnhance.addEventListener('click', (e) => {
                 e.stopPropagation();
                 mejorarFoto(index, btnEnhance);
               });
               item.appendChild(btnEnhance);
+
+              if (foto.original) {
+                const tag = document.createElement('span');
+                tag.className = 'mejorada-tag';
+                tag.textContent = 'CAT';
+                item.appendChild(tag);
+
+                const btnUndo = document.createElement('button');
+                btnUndo.type = 'button';
+                btnUndo.className = 'undo-btn';
+                btnUndo.innerHTML = '↩';
+                btnUndo.setAttribute('aria-label', 'Deshacer mejora (volver a la foto original)');
+                btnUndo.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  deshacerMejora(index);
+                });
+                item.appendChild(btnUndo);
+              }
             }
 
             item.addEventListener('click', () => eliminarFoto(index));
@@ -907,117 +1026,143 @@
         return true;
       }
 
-      // ---------- Postprocesado: chroma key + fondo blanco ----------
+      // ---------- Postprocesado "catálogo" (núcleo en /foto-mejora.js; ver README.md) ----------
+      // Flujo: ✨ → analiza → vista previa antes/después → Aplicar. El original se conserva
+      // en el dispositivo (foto.original) para poder deshacer; NO se envía al servidor.
+      let mejoraEstado = null; // { timestamp, fuente, sesion, metodo, resultado }
+      const pausaUI = () => new Promise((r) => setTimeout(r, 30)); // deja pintar el spinner antes del cálculo
+
       async function mejorarFoto(index, btnEl) {
         if (index < 0 || index >= fotos.length) return;
-        if (btnEl) {
-          btnEl.classList.add('processing');
-          btnEl.innerHTML = '⏳';
-        }
-
+        if (!window.FotoMejora) { alert('El módulo de mejora no se ha cargado. Recarga la app.'); return; }
+        if (btnEl) { btnEl.classList.add('processing'); btnEl.innerHTML = '⏳'; }
         try {
-          const img = new Image();
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = fotos[index].dataUrl;
+          await pausaUI();
+          const foto = fotos[index];
+          const fuente = foto.original || foto.dataUrl;   // siempre se parte del original
+          const sesion = await FotoMejora.crearSesion(fuente, CONFIG.piezas.mejora);
+          mejoraEstado = { timestamp: foto.timestamp, fuente, sesion, metodo: 'auto', resultado: null };
+
+          mejoraAntes.src = fuente;
+          mejoraDespues.removeAttribute('src');
+          mejoraChips.querySelectorAll('.chip').forEach((c) => {
+            c.classList.toggle('active', c.dataset.metodo === 'auto');
+            if (c.dataset.metodo === 'blanquear') c.disabled = !sesion.blanquearPermitido;
           });
-
-          const w = img.width;
-          const h = img.height;
-          const canvas = document.createElement('canvas');
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-
-          const imageData = ctx.getImageData(0, 0, w, h);
-          const data = imageData.data;
-
-          // 1. Analizar píxeles del borde para detectar fondo uniforme
-          const borderPixels = [];
-          const edgeSize = Math.max(3, Math.min(8, Math.floor(Math.min(w, h) * 0.01)));
-          for (let x = 0; x < w; x++) {
-            for (let e = 0; e < edgeSize; e++) {
-              borderPixels.push((e * w + x) * 4);       // borde superior
-              borderPixels.push(((h - 1 - e) * w + x) * 4); // borde inferior
-            }
-          }
-          for (let y = 0; y < h; y++) {
-            for (let e = 0; e < edgeSize; e++) {
-              borderPixels.push((y * w + e) * 4);       // borde izquierdo
-              borderPixels.push((y * w + (w - 1 - e)) * 4); // borde derecho
-            }
-          }
-
-          // Calcular color promedio y varianza del borde
-          let rSum = 0, gSum = 0, bSum = 0, count = 0;
-          for (const idx of borderPixels) {
-            rSum += data[idx];
-            gSum += data[idx + 1];
-            bSum += data[idx + 2];
-            count++;
-          }
-          const rAvg = rSum / count;
-          const gAvg = gSum / count;
-          const bAvg = bSum / count;
-
-          let variance = 0;
-          for (const idx of borderPixels) {
-            const dr = data[idx] - rAvg;
-            const dg = data[idx + 1] - gAvg;
-            const db = data[idx + 2] - bAvg;
-            variance += dr * dr + dg * dg + db * db;
-          }
-          variance = variance / count;
-
-          console.log('Chroma key: color fondo =', Math.round(rAvg), Math.round(gAvg), Math.round(bAvg), 'varianza =', Math.round(variance));
-
-          // Si la varianza es alta, el fondo no es uniforme → preguntar al usuario
-          if (variance > 8000) {
-            const forzar = window.confirm('El fondo no parece uniforme (varianza: ' + Math.round(variance) + '). ¿Quieres forzar el procesamiento de todos modos?');
-            if (!forzar) return;
-          }
-
-          // 2. Chroma key: eliminar píxeles similares al color del borde
-          const tolerance = 80;
-          const toleranceSq = tolerance * tolerance;
-          for (let i = 0; i < data.length; i += 4) {
-            const dr = data[i] - rAvg;
-            const dg = data[i + 1] - gAvg;
-            const db = data[i + 2] - bAvg;
-            const distSq = dr * dr + dg * dg + db * db;
-            if (distSq < toleranceSq) {
-              data[i + 3] = 0; // transparente
-            }
-          }
-
-          // 3. Componer sobre fondo blanco
-          ctx.putImageData(imageData, 0, 0);
-          // Crear canvas final con fondo blanco
-          const finalCanvas = document.createElement('canvas');
-          finalCanvas.width = w;
-          finalCanvas.height = h;
-          const finalCtx = finalCanvas.getContext('2d');
-          finalCtx.fillStyle = '#ffffff';
-          finalCtx.fillRect(0, 0, w, h);
-          finalCtx.drawImage(canvas, 0, 0);
-
-          // 4. Reemplazar la foto
-          const newDataUrl = finalCanvas.toDataURL('image/jpeg', 0.7);
-          fotos[index].dataUrl = newDataUrl;
-          guardarFotosEnDB();
-          actualizarUI();
+          mejoraModal.classList.add('active');
+          await renderMejora('auto');
         } catch (err) {
           console.error('Error al mejorar foto:', err);
           alert('No se pudo mejorar la foto.');
+          cerrarMejora();
         } finally {
-          if (btnEl) {
-            btnEl.classList.remove('processing');
-            btnEl.innerHTML = '✨';
-          }
+          if (btnEl) { btnEl.classList.remove('processing'); btnEl.innerHTML = '✨'; }
         }
       }
+
+      async function renderMejora(metodo) {
+        const st = mejoraEstado;
+        if (!st) return;
+        btnMejoraAplicar.disabled = true;
+        mejoraInfo.className = 'mejora-info';
+        mejoraInfo.textContent = 'Procesando…';
+        await pausaUI();
+        try {
+          const r = st.sesion.componer(metodo);
+          if (mejoraEstado !== st) return;            // se canceló mientras se calculaba
+          st.metodo = metodo;
+          st.resultado = r;
+          mejoraDespues.src = r.dataUrl;
+          const nombre = r.metodo === 'blanquear' ? 'Blanquear' : 'Recortar';
+          mejoraCaption.textContent = 'Después · ' + nombre;
+          const av = r.calidad.avisos.slice();
+          if (metodo === 'blanquear' && r.metodo !== 'blanquear') av.unshift('Blanquear solo funciona con fondo claro y liso; se ha usado Recortar.');
+          mejoraInfo.textContent = av.length ? av.join(' ') : 'Resultado correcto. Comprueba los bordes antes de aplicar.';
+          if (r.calidad.nivel === 'mala') mejoraInfo.classList.add('mala');
+          else if (av.length) mejoraInfo.classList.add('aviso');
+          btnMejoraAplicar.textContent = r.calidad.nivel === 'mala' ? 'Aplicar de todos modos' : 'Aplicar';
+          btnMejoraAplicar.disabled = false;
+        } catch (err) {
+          console.error(err);
+          mejoraInfo.textContent = 'No se pudo procesar esta foto.';
+          mejoraInfo.classList.add('mala');
+        }
+      }
+
+      function cerrarMejora() {
+        mejoraModal.classList.remove('active');
+        mejoraEstado = null;                          // libera la sesión (arrays grandes)
+        mejoraAntes.removeAttribute('src');
+        mejoraDespues.removeAttribute('src');
+      }
+
+      function aplicarMejora() {
+        const st = mejoraEstado;
+        if (!st || !st.resultado) return;
+        const i = fotos.findIndex((f) => f.timestamp === st.timestamp);
+        if (i >= 0) {
+          fotos[i].original = st.fuente;
+          fotos[i].dataUrl = st.resultado.dataUrl;
+          fotos[i].mejora = { metodo: st.resultado.metodo, calidad: st.resultado.calidad.nivel };
+          guardarFotosEnDB();
+          actualizarUI();
+        }
+        cerrarMejora();
+      }
+
+      function deshacerMejora(index) {
+        const f = fotos[index];
+        if (!f || !f.original) return;
+        f.dataUrl = f.original;
+        delete f.original;
+        delete f.mejora;
+        guardarFotosEnDB();
+        actualizarUI();
+      }
+
+      mejoraChips.addEventListener('click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip || chip.disabled || !mejoraEstado) return;
+        mejoraChips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c === chip));
+        renderMejora(chip.dataset.metodo);
+      });
+      btnMejoraAplicar.addEventListener('click', aplicarMejora);
+      btnMejoraCancelar.addEventListener('click', cerrarMejora);
+      mejoraModal.addEventListener('click', (e) => { if (e.target === mejoraModal) cerrarMejora(); });
+
+      /* ===== FASE 2 — MODO PRECISO (pendiente, NO activo) ===========================
+       * Idea: el usuario toca la pieza en la vista previa y un modelo de segmentación
+       * (SlimSAM / MobileSAM vía Transformers.js, Apache-2.0) devuelve la máscara exacta.
+       * Esa máscara entra en el MISMO pipeline mediante
+       * FotoMejora.construirAnalisisDesdeMascara(small, lab, fondo, maskBinaria, opciones),
+       * que ya hace limpieza, alfa suave, encuadre, sombra y composición.
+       * Se ejecuta en el dispositivo (las fotos no salen a ningún tercero) y el modelo
+       * (decenas de MB) se descarga SOLO al pulsar "Preciso"; queda en caché del navegador.
+       *
+       * ESQUELETO SIN PROBAR: verificar la API vigente de @huggingface/transformers, fijar
+       * versión, y revisar la licencia del modelo elegido antes de activarlo.
+       *
+       * let samCargado = null;
+       * async function cargarSAM() {
+       *   if (samCargado) return samCargado;
+       *   const T = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@<VERSION_FIJA>');
+       *   const model = await T.SamModel.from_pretrained('Xenova/slimsam-77-uniform');
+       *   const processor = await T.AutoProcessor.from_pretrained('Xenova/slimsam-77-uniform');
+       *   return (samCargado = { T, model, processor });
+       * }
+       * async function segmentarPorToque(dataUrl, xRel, yRel) {
+       *   const { T, model, processor } = await cargarSAM();
+       *   const imagen = await T.RawImage.fromURL(dataUrl);
+       *   const puntos = [[[xRel * imagen.width, yRel * imagen.height]]];
+       *   const inputs = await processor(imagen, { input_points: puntos });
+       *   const out = await model(inputs);
+       *   const masks = await processor.post_process_masks(out.pred_masks, inputs.original_sizes, inputs.reshaped_input_sizes);
+       *   // → elegir la máscara con mayor out.iou_scores, reducirla a ≤800 px y devolverla binaria (1 = pieza)
+       * }
+       * Cambios necesarios: activar el chip "🎯 Preciso" (comentado en #mejoraChips), listener de toque
+       * sobre #mejoraAntes, ampliar CSP/permiso a cdn.jsdelivr.net y huggingface.co si se define una CSP,
+       * y NO precachear el modelo en STATIC_ASSETS del service worker.
+       * ============================================================================ */
 
       // ---------- Cámara ----------
       async function abrirCamara() {
@@ -1030,13 +1175,18 @@
           return;
         }
         try {
+          const modoPieza = moduloActual === 'pieza';
           const constraints = {
-            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+            video: modoPieza
+              ? { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+              : { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
           };
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           video.srcObject = stream;
           await video.play();
+          cameraModal.classList.toggle('square', modoPieza);   // visor 1:1 solo en Piezas
+          camGuide.hidden = !modoPieza;
           cameraModal.classList.add('active');
           btnCapturar.disabled = false;
           capturando = false;
@@ -1074,21 +1224,23 @@
         capturando = true;
         btnCapturar.disabled = true;
 
-        const canvas = document.createElement('canvas');
-        const maxDim = 1024;
-        let w = video.videoWidth;
-        let h = video.videoHeight;
-        if (w > maxDim || h > maxDim) {
-          const ratio = Math.min(maxDim / w, maxDim / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
+        // Ajustes por módulo (ver CONFIG). En Piezas se recorta el cuadrado central, igual que el visor.
+        const cfg = (moduloActual === 'pieza' ? CONFIG.piezas : CONFIG.envios).captura;
+        const vw = video.videoWidth, vh = video.videoHeight;
+        let sx = 0, sy = 0, sw = vw, sh = vh;
+        if (cfg.cuadrada) {
+          const lado = Math.min(vw, vh);
+          sx = (vw - lado) / 2; sy = (vh - lado) / 2; sw = sh = lado;
         }
+        const k = Math.min(1, cfg.maxLado / Math.max(sw, sh));
+        const w = Math.round(sw * k), h = Math.round(sh * k);
+        const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
         const timestamp = Date.now();
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const dataUrl = canvas.toDataURL('image/jpeg', cfg.calidad);
 
         const ok = agregarFoto(dataUrl, timestamp);
         if (ok) {
@@ -1243,6 +1395,12 @@
           payload.destinatario = destinatario;
         }
 
+        const cuerpo = JSON.stringify(payload);
+        if (cuerpo.length > CONFIG.maxPayloadBytes) {
+          alert('El envío pesa demasiado (' + (cuerpo.length / 1048576).toFixed(1) + ' MB; máximo ~5,5 MB).\n\nElimina alguna foto o envíalas en dos tandas.');
+          return;
+        }
+
         btnEnviar.classList.add('loading');
         btnEnviar.disabled = true;
 
@@ -1250,7 +1408,7 @@
           const response = await fetchWithAuth('/.netlify/functions/envio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: cuerpo
           });
 
           if (response.ok) {

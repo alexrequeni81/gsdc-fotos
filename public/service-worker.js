@@ -1,10 +1,11 @@
-// Cache de la app PWA GSDC Fotos Envíos (v4).
+// Cache de la app PWA GSDC Fotos Envíos (v6).
 // Estrategia: precarga de estáticos, red primero con fallback a caché,
 // y paso directo a red para las llamadas a las Netlify Functions.
-const CACHE_NAME = 'gsdc-fotos-v5';
+const CACHE_NAME = 'gsdc-fotos-v6'; // SUBIR el número en cada despliegue que cambie estáticos
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  '/foto-mejora.js',
   '/manifest.json',
   '/icon-192.svg',
   '/icon-512.svg',
