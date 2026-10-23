@@ -856,8 +856,13 @@
       <div class="mejora-settings" id="mejoraSettings">
         <div class="slider-row">
           <label>Tolerancia</label>
-          <input type="range" id="sliderTol" min="1" max="60" step="1" value="15" />
+          <input type="range" id="sliderTol" min="0" max="60" step="1" value="15" />
           <span class="slider-val" id="valTol">15</span>
+        </div>
+        <div class="slider-row">
+          <label>Contraste</label>
+          <input type="range" id="sliderContraste" min="0.5" max="2.0" step="0.05" value="1.0" />
+          <span class="slider-val" id="valContraste">1.00</span>
         </div>
         <div class="slider-row">
           <label>Margen</label>
@@ -1167,7 +1172,7 @@
           const foto = fotos[index];
           const fuente = foto.original || foto.dataUrl;   // siempre se parte del original
           const sesion = await FotoMejora.crearSesion(fuente, CONFIG.piezas.mejora);
-          mejoraEstado = { timestamp: foto.timestamp, fuente, sesion, metodo: 'auto', resultado: null };
+          mejoraEstado = { timestamp: foto.timestamp, fuente, originalFuente: fuente, sesion, metodo: 'auto', resultado: null };
 
           mejoraAntes.src = fuente;
           mejoraDespues.removeAttribute('src');
@@ -1227,7 +1232,7 @@
         if (!st || !st.resultado) return;
         const i = fotos.findIndex((f) => f.timestamp === st.timestamp);
         if (i >= 0) {
-          fotos[i].original = st.fuente;
+          fotos[i].original = st.originalFuente || st.fuente;
           fotos[i].dataUrl = st.resultado.dataUrl;
           fotos[i].mejora = { metodo: st.resultado.metodo, calidad: st.resultado.calidad.nivel };
           guardarFotosEnDB();
@@ -1260,10 +1265,12 @@
       const btnToggleSettings = document.getElementById('btnToggleSettings');
       const mejoraSettings = document.getElementById('mejoraSettings');
       const sliderTol = document.getElementById('sliderTol');
+      const sliderContraste = document.getElementById('sliderContraste');
       const sliderMargen = document.getElementById('sliderMargen');
       const sliderSombra = document.getElementById('sliderSombra');
       const sliderPesoL = document.getElementById('sliderPesoL');
       const valTol = document.getElementById('valTol');
+      const valContraste = document.getElementById('valContraste');
       const valMargen = document.getElementById('valMargen');
       const valSombra = document.getElementById('valSombra');
       const valPesoL = document.getElementById('valPesoL');
@@ -1277,6 +1284,7 @@
       let settingsDebounce = null;
       function onSettingsChange() {
         if (valTol) valTol.textContent = sliderTol.value;
+        if (valContraste) valContraste.textContent = parseFloat(sliderContraste.value).toFixed(2);
         if (valMargen) valMargen.textContent = parseFloat(sliderMargen.value).toFixed(2);
         if (valSombra) valSombra.textContent = parseFloat(sliderSombra.value).toFixed(2);
         if (valPesoL) valPesoL.textContent = parseFloat(sliderPesoL.value).toFixed(2);
@@ -1286,17 +1294,25 @@
         settingsDebounce = setTimeout(async () => {
           const st = mejoraEstado;
           if (!st) return;
-          const opts = Object.assign({}, CONFIG.piezas.mejora, {
-            tolMin: parseInt(sliderTol.value, 10),
-            tolMax: parseInt(sliderTol.value, 10) + 15,
-            margen: parseFloat(sliderMargen.value),
-            sombra: parseFloat(sliderSombra.value),
-            pesoL: parseFloat(sliderPesoL.value)
-          });
           try {
-            const sesion = await FotoMejora.crearSesion(st.fuente, opts);
+            // Aplicar contraste a la imagen fuente si es diferente de 1.0
+            let fuente = st.originalFuente || st.fuente;
+            const contraste = parseFloat(sliderContraste.value);
+            if (contraste !== 1.0) {
+              fuente = await aplicarContraste(fuente, contraste);
+            }
+            const opts = Object.assign({}, CONFIG.piezas.mejora, {
+              tolMin: parseInt(sliderTol.value, 10),
+              tolMax: parseInt(sliderTol.value, 10) + 15,
+              margen: parseFloat(sliderMargen.value),
+              sombra: parseFloat(sliderSombra.value),
+              pesoL: parseFloat(sliderPesoL.value)
+            });
+            const sesion = await FotoMejora.crearSesion(fuente, opts);
             if (mejoraEstado !== st) return;
             st.sesion = sesion;
+            st.fuente = fuente;
+            mejoraAntes.src = fuente;
             const metodoActivo = mejoraChips.querySelector('.chip.active')?.dataset.metodo || 'auto';
             await renderMejora(metodoActivo);
           } catch (e) {
@@ -1305,7 +1321,33 @@
         }, 400);
       }
 
+      // ---------- Ajuste de contraste (Canvas) ----------
+      function aplicarContraste(dataUrl, factor) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const intercept = 128 * (1 - factor);
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.min(255, Math.max(0, data[i] * factor + intercept));
+              data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor + intercept));
+              data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor + intercept));
+            }
+            ctx.putImageData(imageData, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
+          };
+          img.src = dataUrl;
+        });
+      }
+
       if (sliderTol) sliderTol.addEventListener('input', onSettingsChange);
+      if (sliderContraste) sliderContraste.addEventListener('input', onSettingsChange);
       if (sliderMargen) sliderMargen.addEventListener('input', onSettingsChange);
       if (sliderSombra) sliderSombra.addEventListener('input', onSettingsChange);
       if (sliderPesoL) sliderPesoL.addEventListener('input', onSettingsChange);
