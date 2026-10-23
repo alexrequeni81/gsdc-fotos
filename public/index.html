@@ -936,7 +936,7 @@
 
           // 1. Analizar píxeles del borde para detectar fondo uniforme
           const borderPixels = [];
-          const edgeSize = Math.max(5, Math.min(20, Math.floor(Math.min(w, h) * 0.02)));
+          const edgeSize = Math.max(3, Math.min(8, Math.floor(Math.min(w, h) * 0.01)));
           for (let x = 0; x < w; x++) {
             for (let e = 0; e < edgeSize; e++) {
               borderPixels.push((e * w + x) * 4);       // borde superior
@@ -971,14 +971,16 @@
           }
           variance = variance / count;
 
-          // Si la varianza es alta, el fondo no es uniforme → no procesar
-          if (variance > 1500) {
-            alert('El fondo no parece uniforme. No se puede procesar automáticamente.');
-            return;
+          console.log('Chroma key: color fondo =', Math.round(rAvg), Math.round(gAvg), Math.round(bAvg), 'varianza =', Math.round(variance));
+
+          // Si la varianza es alta, el fondo no es uniforme → preguntar al usuario
+          if (variance > 8000) {
+            const forzar = window.confirm('El fondo no parece uniforme (varianza: ' + Math.round(variance) + '). ¿Quieres forzar el procesamiento de todos modos?');
+            if (!forzar) return;
           }
 
           // 2. Chroma key: eliminar píxeles similares al color del borde
-          const tolerance = 60;
+          const tolerance = 80;
           const toleranceSq = tolerance * tolerance;
           for (let i = 0; i < data.length; i += 4) {
             const dr = data[i] - rAvg;
