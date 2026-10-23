@@ -282,21 +282,24 @@
     .photo-item {
       position: relative;
       width: 80px;
-      height: 80px;
       border-radius: 16px;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       background: #eef2f6;
       flex-shrink: 0;
       border: 2px solid white;
       cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .photo-item img {
-      width: 100%;
-      height: 100%;
+      width: 80px;
+      height: 80px;
       object-fit: cover;
       display: block;
+      border-radius: 14px;
     }
 
     .photo-item .remove-btn {
@@ -736,6 +739,11 @@
       const btnCapturar = document.getElementById('btnCapturar');
       const btnCerrarCamara = document.getElementById('btnCerrarCamara');
       const toast = document.getElementById('toast');
+
+      const authModal = document.getElementById('authModal');
+      const authInput = document.getElementById('authInput');
+      const authError = document.getElementById('authError');
+      const btnAuthSubmit = document.getElementById('btnAuthSubmit');
 
       // ---------- Estado ----------
       const fotos = []; // { dataUrl, timestamp }
@@ -1402,10 +1410,6 @@
 
       // ---------- Clave de activación (almacenada en localStorage) ----------
       const TOKEN_KEY = 'gsdc_app_token';
-            const authModal = document.getElementById('authModal');
-      const authInput = document.getElementById('authInput');
-      const authError = document.getElementById('authError');
-      const btnAuthSubmit = document.getElementById('btnAuthSubmit');
 
       function getStoredToken() {
         try { return localStorage.getItem(TOKEN_KEY); } catch (_) { return null; }
