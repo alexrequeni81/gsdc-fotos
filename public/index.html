@@ -856,22 +856,22 @@
       <div class="mejora-settings" id="mejoraSettings">
         <div class="slider-row">
           <label>Tolerancia</label>
-          <input type="range" id="sliderTol" min="5" max="40" step="1" value="15" />
+          <input type="range" id="sliderTol" min="1" max="60" step="1" value="15" />
           <span class="slider-val" id="valTol">15</span>
         </div>
         <div class="slider-row">
           <label>Margen</label>
-          <input type="range" id="sliderMargen" min="0.03" max="0.20" step="0.01" value="0.09" />
+          <input type="range" id="sliderMargen" min="0.01" max="0.30" step="0.01" value="0.09" />
           <span class="slider-val" id="valMargen">0.09</span>
         </div>
         <div class="slider-row">
           <label>Sombra</label>
-          <input type="range" id="sliderSombra" min="0" max="1" step="0.1" value="0.8" />
-          <span class="slider-val" id="valSombra">0.8</span>
+          <input type="range" id="sliderSombra" min="0" max="1" step="0.05" value="0.8" />
+          <span class="slider-val" id="valSombra">0.80</span>
         </div>
         <div class="slider-row">
           <label>Peso L</label>
-          <input type="range" id="sliderPesoL" min="0.1" max="0.9" step="0.05" value="0.4" />
+          <input type="range" id="sliderPesoL" min="0.05" max="0.95" step="0.01" value="0.40" />
           <span class="slider-val" id="valPesoL">0.40</span>
         </div>
       </div>
@@ -1278,7 +1278,7 @@
       function onSettingsChange() {
         if (valTol) valTol.textContent = sliderTol.value;
         if (valMargen) valMargen.textContent = parseFloat(sliderMargen.value).toFixed(2);
-        if (valSombra) valSombra.textContent = parseFloat(sliderSombra.value).toFixed(1);
+        if (valSombra) valSombra.textContent = parseFloat(sliderSombra.value).toFixed(2);
         if (valPesoL) valPesoL.textContent = parseFloat(sliderPesoL.value).toFixed(2);
 
         if (!mejoraEstado) return;
