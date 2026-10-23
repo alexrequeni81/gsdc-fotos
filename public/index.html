@@ -494,24 +494,31 @@
     }
 
     /* Vista previa de mejora */
-    .mejora-box { max-width: 460px; }
+    .mejora-box { max-width: 460px; width: 100%; }
     .mejora-compare { display: flex; gap: 10px; margin-bottom: 12px; }
     .mejora-compare figure { flex: 1; margin: 0; }
     .mejora-compare img {
       width: 100%; aspect-ratio: 1 / 1; object-fit: contain; display: block;
       border-radius: 12px; background: #eef2f6; border: 1px solid #e2e8f0;
+      min-height: 200px;
     }
-    .mejora-compare figcaption { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .mejora-compare figcaption { font-size: 13px; color: #64748b; margin-top: 6px; text-align: center; }
     .mejora-chips { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
     .mejora-chips .chip {
       border: 1.5px solid #e2e8f0; background: #fff; color: #334155;
-      padding: 7px 14px; border-radius: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
+      padding: 8px 16px; border-radius: 40px; font-size: 14px; font-weight: 600; cursor: pointer;
+      touch-action: manipulation;
     }
     .mejora-chips .chip.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
     .mejora-chips .chip:disabled { opacity: 0.4; cursor: not-allowed; }
     .notice-box p.mejora-info { font-size: 13px; min-height: 36px; margin-bottom: 14px; }
     .mejora-info.aviso { color: #b45309; }
     .mejora-info.mala { color: #dc2626; }
+
+    @media (max-width: 480px) {
+      .mejora-box { max-width: 95vw; }
+      .mejora-compare img { min-height: 160px; }
+    }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: scale(0.96); }
@@ -631,7 +638,11 @@
 
     @media (max-width: 480px) {
       .app { padding: 20px 16px 84px; }
-      .photo-item { width: 70px; height: 70px; }
+      .photo-item { width: 70px; }
+      .photo-item img { width: 70px; height: 70px; }
+      .photo-item .remove-btn,
+      .photo-item .enhance-btn,
+      .photo-item .undo-btn { width: 24px; height: 24px; font-size: 11px; line-height: 24px; }
       .btn-camera { font-size: 15px; padding: 12px 16px; }
       .camera-modal .cam-btn { font-size: 15px; padding: 12px 20px; }
     }
@@ -705,6 +716,7 @@
             <span>📸</span> Tomar foto
           </button>
           <button type="button" class="btn-vaciar" id="btnVaciar" hidden disabled>🔄 Vaciar</button>
+          <button type="button" class="btn-vaciar" id="btnDescargar" hidden disabled>📥 Descargar</button>
         </div>
         <div class="gallery" id="galeria">
           <div class="empty-msg">Todavía no hay fotos</div>
@@ -811,6 +823,7 @@
       const btnAbrirCamara = document.getElementById('btnAbrirCamara');
       const btnEnviar = document.getElementById('btnEnviar');
       const btnVaciar = document.getElementById('btnVaciar');
+      const btnDescargar = document.getElementById('btnDescargar');
       const cameraModal = document.getElementById('cameraModal');
       const video = document.getElementById('videoCam');
       const btnCapturar = document.getElementById('btnCapturar');
@@ -981,6 +994,8 @@
         btnAbrirCamara.disabled = fotos.length >= MAX_FOTOS;
         btnVaciar.hidden = !envioFallido;
         btnVaciar.disabled = fotos.length === 0;
+        btnDescargar.hidden = fotos.length === 0;
+        btnDescargar.disabled = fotos.length === 0;
 
         let campoValido = false;
         if (moduloActual === 'pieza') {
@@ -1013,6 +1028,27 @@
         limpiarFotosEnDB();
         envioFallido = false;
         actualizarUI();
+      }
+
+      function descargarFotos() {
+        if (fotos.length === 0) return;
+        fotos.forEach((foto, i) => {
+          const a = document.createElement('a');
+          a.href = foto.dataUrl;
+          const ext = foto.dataUrl.match(/^data:image\/(\w+);/) ? foto.dataUrl.match(/^data:image\/(\w+);/)[1] : 'jpg';
+          let nombre;
+          if (moduloActual === 'pieza') {
+            const codigo = (codigoPiezaInput.value.trim() || 'pieza').replace(/[^a-zA-Z0-9\-_]/g, '_');
+            nombre = `${codigo}_${i + 1}.${ext}`;
+          } else {
+            const dest = (destinatarioInput.value.trim() || 'envio').replace(/[^a-zA-Z0-9\-_]/g, '_');
+            nombre = `${dest}_${i + 1}.${ext}`;
+          }
+          a.download = nombre;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        });
       }
 
       function agregarFoto(dataUrl, timestamp = Date.now()) {
@@ -1292,6 +1328,7 @@
       btnCapturar.addEventListener('click', capturarFoto);
       btnCerrarCamara.addEventListener('click', cerrarCamara);
       btnVaciar.addEventListener('click', vaciarFotos);
+      btnDescargar.addEventListener('click', descargarFotos);
 
       // ---------- Cambio de módulo ----------
       tabEnvios.addEventListener('click', () => cambiarModulo('envio'));
