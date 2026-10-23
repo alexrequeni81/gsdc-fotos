@@ -512,8 +512,75 @@
     .mejora-chips .chip.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
     .mejora-chips .chip:disabled { opacity: 0.4; cursor: not-allowed; }
     .notice-box p.mejora-info { font-size: 13px; min-height: 36px; margin-bottom: 14px; }
-    .mejora-info.aviso { color: #b45309; }
-    .mejora-info.mala { color: #dc2626; }
+    .mejora-settings {
+      display: none;
+      margin-bottom: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+    .mejora-settings.active { display: block; }
+    .mejora-settings .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mejora-settings .slider-row:last-child { margin-bottom: 0; }
+    .mejora-settings label {
+      font-size: 12px;
+      color: #475569;
+      font-weight: 600;
+      min-width: 90px;
+      text-align: left;
+    }
+    .mejora-settings input[type="range"] {
+      flex: 1;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #e2e8f0;
+      border-radius: 3px;
+      outline: none;
+    }
+    .mejora-settings input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4f46e5;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(79,70,229,0.3);
+    }
+    .mejora-settings input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4f46e5;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(79,70,229,0.3);
+    }
+    .mejora-settings .slider-val {
+      font-size: 12px;
+      color: #64748b;
+      min-width: 32px;
+      text-align: right;
+      font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+    }
+    .mejora-toggle-settings {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .mejora-toggle-settings:hover { background: #f1f5f9; color: #4f46e5; }
 
     @media (max-width: 480px) {
       .mejora-box { max-width: 95vw; }
@@ -784,6 +851,29 @@
         <button type="button" class="chip" data-metodo="blanquear">Blanquear</button>
         <button type="button" class="chip" data-metodo="recortar">Recortar</button>
         <!-- FASE 2 (modo preciso, pendiente): <button type="button" class="chip" data-metodo="preciso">🎯 Preciso</button> -->
+      </div>
+      <button type="button" class="mejora-toggle-settings" id="btnToggleSettings">⚙️ Ajustes avanzados</button>
+      <div class="mejora-settings" id="mejoraSettings">
+        <div class="slider-row">
+          <label>Tolerancia</label>
+          <input type="range" id="sliderTol" min="5" max="40" step="1" value="15" />
+          <span class="slider-val" id="valTol">15</span>
+        </div>
+        <div class="slider-row">
+          <label>Margen</label>
+          <input type="range" id="sliderMargen" min="0.03" max="0.20" step="0.01" value="0.09" />
+          <span class="slider-val" id="valMargen">0.09</span>
+        </div>
+        <div class="slider-row">
+          <label>Sombra</label>
+          <input type="range" id="sliderSombra" min="0" max="1" step="0.1" value="0.8" />
+          <span class="slider-val" id="valSombra">0.8</span>
+        </div>
+        <div class="slider-row">
+          <label>Peso L</label>
+          <input type="range" id="sliderPesoL" min="0.1" max="0.9" step="0.05" value="0.4" />
+          <span class="slider-val" id="valPesoL">0.40</span>
+        </div>
       </div>
       <p class="mejora-info" id="mejoraInfo"></p>
       <div style="display:flex;gap:10px;justify-content:center;">
@@ -1165,6 +1255,60 @@
       btnMejoraAplicar.addEventListener('click', aplicarMejora);
       btnMejoraCancelar.addEventListener('click', cerrarMejora);
       mejoraModal.addEventListener('click', (e) => { if (e.target === mejoraModal) cerrarMejora(); });
+
+      // ---------- Ajustes avanzados (sliders) ----------
+      const btnToggleSettings = document.getElementById('btnToggleSettings');
+      const mejoraSettings = document.getElementById('mejoraSettings');
+      const sliderTol = document.getElementById('sliderTol');
+      const sliderMargen = document.getElementById('sliderMargen');
+      const sliderSombra = document.getElementById('sliderSombra');
+      const sliderPesoL = document.getElementById('sliderPesoL');
+      const valTol = document.getElementById('valTol');
+      const valMargen = document.getElementById('valMargen');
+      const valSombra = document.getElementById('valSombra');
+      const valPesoL = document.getElementById('valPesoL');
+
+      if (btnToggleSettings && mejoraSettings) {
+        btnToggleSettings.addEventListener('click', () => {
+          mejoraSettings.classList.toggle('active');
+        });
+      }
+
+      let settingsDebounce = null;
+      function onSettingsChange() {
+        if (valTol) valTol.textContent = sliderTol.value;
+        if (valMargen) valMargen.textContent = parseFloat(sliderMargen.value).toFixed(2);
+        if (valSombra) valSombra.textContent = parseFloat(sliderSombra.value).toFixed(1);
+        if (valPesoL) valPesoL.textContent = parseFloat(sliderPesoL.value).toFixed(2);
+
+        if (!mejoraEstado) return;
+        clearTimeout(settingsDebounce);
+        settingsDebounce = setTimeout(async () => {
+          const st = mejoraEstado;
+          if (!st) return;
+          const opts = Object.assign({}, CONFIG.piezas.mejora, {
+            tolMin: parseInt(sliderTol.value, 10),
+            tolMax: parseInt(sliderTol.value, 10) + 15,
+            margen: parseFloat(sliderMargen.value),
+            sombra: parseFloat(sliderSombra.value),
+            pesoL: parseFloat(sliderPesoL.value)
+          });
+          try {
+            const sesion = await FotoMejora.crearSesion(st.fuente, opts);
+            if (mejoraEstado !== st) return;
+            st.sesion = sesion;
+            const metodoActivo = mejoraChips.querySelector('.chip.active')?.dataset.metodo || 'auto';
+            await renderMejora(metodoActivo);
+          } catch (e) {
+            console.error('Error al re-renderizar:', e);
+          }
+        }, 400);
+      }
+
+      if (sliderTol) sliderTol.addEventListener('input', onSettingsChange);
+      if (sliderMargen) sliderMargen.addEventListener('input', onSettingsChange);
+      if (sliderSombra) sliderSombra.addEventListener('input', onSettingsChange);
+      if (sliderPesoL) sliderPesoL.addEventListener('input', onSettingsChange);
 
       /* ===== FASE 2 — MODO PRECISO (pendiente, NO activo) ===========================
        * Idea: el usuario toca la pieza en la vista previa y un modelo de segmentación
